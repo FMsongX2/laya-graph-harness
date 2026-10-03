@@ -143,16 +143,17 @@ def render(records):
         here, first = paper_path[paper], items[0]
         body = frontmatter({"id": paper, "kind": "laya-paper", "title": first["paper_title"],
                             "source_url": first.get("source_url", ""), "pdf_sha256": first["pdf_sha256"],
-                            "assertions": len(items), "tags": ["laya/paper"]})
+                            "assertions": len(items), "scientific_truth_certified":False,"tags": ["laya/paper"]})
         body += f"# {paper}: {first['paper_title']}\n\n{first.get('source_url', '')}\n\n## Reviewed assertions\n\n"
         body += "\n".join(f"- {link(r['id'], here, assertion_path[r['id']])}: {r['source']['name']} "
                           f"*{r['relation'].replace('_', ' ')}* {r['target']['name']}" for r in sorted(items, key=lambda r: r["id"]))
-        files[here] = body + "\n"
+        files[here] = body + f"\n\n> [!note] {caution}\n"
 
     for key, entity in sorted(entities.items()):
         here = entity_path[key]
         body = frontmatter({"kind": "laya-entity", "name": entity["name"], "entity_type": entity["type"],
-                            "aliases": sorted(entity["aliases"]), "tags": ["laya/entity/" + entity["type"]]})
+                            "aliases": sorted(entity["aliases"]), "scientific_truth_certified":False,
+                            "tags": ["laya/entity/" + entity["type"]]})
         body += f"# {entity['name']}\n\n*{entity['type']}*"
         if entity["aliases"]: body += " · reviewed aliases: " + ", ".join(sorted(entity["aliases"]))
         for role, heading in (("source", "As source"), ("target", "As target")):
@@ -161,13 +162,14 @@ def render(records):
                     f"- {link(r['id'], here, assertion_path[r['id']])}: {r['source']['name']} "
                     f"*{r['relation'].replace('_', ' ')}* {r['target']['name']} ({r['paper_id']})"
                     for r in sorted(entity[role], key=lambda r: r["id"]))
-        files[here] = body + "\n"
+        files[here] = body + f"\n\n> [!note] {caution}\n"
 
     index = Path("README.md")
     relations = defaultdict(int)
     for record in records: relations[record["relation"]] += 1
     body = frontmatter({"kind": "laya-export-index", "format": FORMAT, "assertions": len(records),
-                        "papers": len(papers), "entities": len(entities), "tags": ["laya/index"]})
+                        "papers": len(papers), "entities": len(entities),
+                        "scientific_truth_certified":False,"tags": ["laya/index"]})
     body += ("# Laya reviewed knowledge\n\nGenerated from approved source assertions by `kg export-obsidian`. "
              "Do not edit these notes: they are replaced on the next export, and an edited note blocks it. "
              "Link to them from your own notes instead.\n\n## Papers\n\n")

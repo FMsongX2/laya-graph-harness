@@ -59,6 +59,8 @@ class ObsidianExport(unittest.TestCase):
         self.assertEqual(result["assertions"], 4)
         notes = self.notes()
         for name, text in notes.items():
+            self.assertIn('scientific_truth_certified: false',text)
+            self.assertIn('not a certification',text)
             for bracketed, plain in re.findall(r"\]\((?:<([^>]+)>|([^)\s]+))\)", text):
                 target = bracketed or plain
                 if target.startswith("http"): continue
