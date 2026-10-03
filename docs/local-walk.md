@@ -72,3 +72,20 @@ that name the intermediate method, one agent run per case/arm with alternating
 order, and three local repeats. It does not establish general accuracy,
 statistical significance, discovery quality, final-answer quality or cold-start
 performance. Raw private corpus/graph traces remain in the installed project.
+
+## Model replacement boundary
+
+Keep the traversal loop when assessing a future decision model. `WalkEngine`
+receives its graph and worker as constructor dependencies. The loop owns candidate
+generation, visited state, evidence reads and termination; the worker owns model
+loading and `evaluate(payload)`. A replacement adapter can translate the same
+goal/current-node/recent-evidence/choice-menu input to the new provider and return
+the selected offered key, probabilities and truncation information in the current
+worker contract. Graph IDs and evidence provenance remain under the loop's control.
+
+The installed provider is still Laya. Connecting a future model requires checking
+its actual API and output contract, then rerunning matched goal/evidence and
+latency comparisons. If an adapter makes remote calls, update the current
+local-only call counts and timing metadata to reflect that execution. Preserve
+this substitution point without committing the architecture to an unreleased
+model or presuming that its latency or navigation quality will be better.
