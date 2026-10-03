@@ -49,9 +49,13 @@ docker build -t knowledgegraph-neo4j:5.26.31-local knowledgegraph/config/neo4j
 
 ## Windows and NVIDIA CUDA
 
-The runtime runs natively on Windows 10/11 with an NVIDIA GPU. No WSL is
-required; Neo4j still runs as a Linux container under Docker Desktop (WSL 2
-backend), which the CLI starts if it is installed in the default location.
+The Python runtime and the Laya worker run natively on Windows 10/11 with an
+NVIDIA GPU. Neo4j is still a Linux container, so Docker Desktop with its WSL 2
+backend is required for the graph; the CLI starts Docker Desktop if it is
+installed in the default location.
+
+`install.ps1` performs the steps below and reports missing private assets.
+Manual equivalent:
 
 ```powershell
 py -3.12 -m venv knowledgegraph\.venv

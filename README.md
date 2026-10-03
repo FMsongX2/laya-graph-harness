@@ -20,6 +20,40 @@ knowledge corpus are separate local assets and are not in this repository.
   process ownership checks, and lazy restart on the next managed call.
 - Agent skill/bootstrap source, installation overlay, contract tests, and
   sanitized local benchmark aggregates.
+- macOS (MPS), Linux and Windows, with NVIDIA CUDA on Linux/Windows.
+
+## Install
+
+Either way, the private assets (base model, trained head, embedding snapshot,
+dataset state, approved records, Neo4j key) are supplied separately; the
+installers report exactly which ones are still missing.
+
+**Native**, Python 3.12. Creates both environments (CUDA wheels when an NVIDIA
+GPU is present), fetches the pinned Laya source, writes ignored configs and
+builds the Neo4j image:
+
+```sh
+./install.sh                     # macOS / Linux
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1    # Windows
+```
+
+Re-run with `check` at any time; then `knowledgegraph/kg prepare`
+(`knowledgegraph\kg.cmd prepare` on Windows).
+
+**Docker**, NVIDIA GPU by default, assets in `./laya-home`:
+
+```sh
+docker compose build
+docker compose run --rm harness check
+docker compose up -d
+docker compose exec harness kg select --request /data/laya/requests/example.json
+```
+
+See [Docker deployment](docs/docker.md) and
+[deployment prerequisites](docs/deployment.md).
 
 ## Run the tests without models or private data
 

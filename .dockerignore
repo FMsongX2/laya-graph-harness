@@ -1,0 +1,18 @@
+# Allow-list: the image contains authored code only. Private corpus, state,
+# credentials, weights, environments and local configs never enter the context.
+*
+!Dockerfile
+!docker/
+!requirements*.txt
+!scripts/
+!model-worker/worker.py
+!model-worker/build_data.py
+!knowledgegraph/kg
+!knowledgegraph/config/*.example.json
+!knowledgegraph/config/graph-extraction.txt
+!knowledgegraph/config/lifecycle.json
+!knowledgegraph/config/neo4j/
+!knowledgegraph/runtime/*.py
+!knowledgegraph/tools/*.py
+!plugins/
+**/__pycache__

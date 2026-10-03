@@ -26,3 +26,23 @@ jobs:
       - run: python -m unittest discover -s knowledgegraph/tests -p 'test_*.py' -v
       - run: python -m unittest discover -s tests -p 'test_*.py' -v
       - run: python scripts/check_export.py
+  image:
+    # CPU flavor keeps the runner within its disk budget; the CUDA flavor differs only in the torch wheel.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker compose config --quiet && docker compose -f compose.yaml -f compose.cpu.yaml config --quiet
+      - run: docker build --build-arg TORCH_FLAVOR=cpu -t laya-graph-harness:ci .
+      - name: Container reports the missing private assets
+        run: |
+          set +e
+          docker run --rm laya-graph-harness:ci check
+          test $? -eq 1
+      - name: Both environments import their stacks
+        run: |
+          docker run --rm laya-graph-harness:ci sh -c '
+            knowledgegraph/.venv/bin/python -c "import cognee, sentence_transformers, fastapi, neo4j" &&
+            PYTHONPATH=model-worker/vendor/laya .venv-model/bin/python -c "import torch, transformers, laya; print(torch.__version__)" &&
+            kg doctor'
