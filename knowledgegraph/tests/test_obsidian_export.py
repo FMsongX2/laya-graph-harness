@@ -111,6 +111,29 @@ class ObsidianExport(unittest.TestCase):
         self.save(draft)
         with self.assertRaisesRegex(ValueError, "not a source-reviewed record"): self.export()
 
+    def test_new_generated_name_cannot_overwrite_an_unowned_note(self):
+        self.export()
+        note=self.out/'entities/Future method.md';note.write_text('my personal note',encoding='utf-8')
+        self.save(approved('P03',1,('Future method','Method'),'solves',('New task','Problem'),'The future method solves this task.'))
+        with self.assertRaisesRegex(ValueError,'unowned'):self.export()
+        self.assertEqual(note.read_text(encoding='utf-8'),'my personal note')
+
+    def test_manifest_paths_cannot_escape_the_export_root(self):
+        self.export();victim=self.out.parent/'keep.md';victim.write_text('keep me',encoding='utf-8')
+        manifest=self.out/exporter.MANIFEST;data=json.loads(manifest.read_text(encoding='utf-8'))
+        data['files']['../keep.md']=exporter.sha(victim.read_bytes())
+        manifest.write_text(json.dumps(data),encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'path'):self.export()
+        self.assertEqual(victim.read_text(encoding='utf-8'),'keep me')
+
+    def test_symlinked_output_subfolder_is_refused_before_writes(self):
+        self.out.mkdir(parents=True);outside=self.out.parent/'outside';outside.mkdir()
+        try:(self.out/'entities').symlink_to(outside,target_is_directory=True)
+        except OSError:self.skipTest('Directory symlinks unavailable on this host')
+        (self.out/exporter.MANIFEST).write_text(json.dumps({'format':exporter.FORMAT,'files':{}}),encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'path'):self.export()
+        self.assertFalse(any(outside.iterdir()))
+
 
 if __name__ == "__main__":
     unittest.main()

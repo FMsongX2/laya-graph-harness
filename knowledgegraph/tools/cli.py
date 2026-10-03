@@ -238,10 +238,18 @@ def main():
     select_cmd.add_argument("--request", help="단일 또는 items 배치 JSON 파일; -는 stdin")
     select_cmd.add_argument("--paper", help="논문 범위, 예: P03")
     select_cmd.add_argument("--excerpt-file", help="영어 원문 60~1000자 파일; -는 stdin")
-    select_cmd.add_argument("--policy", choices=["auto", "laya"], default="auto")
+    select_cmd.add_argument("--policy", choices=["auto", "laya", "model"], default="auto")
     select_cmd.add_argument("--include-candidates", action="store_true")
     export = commands.add_parser("export-obsidian", help="승인된 근거를 읽기 전용 Obsidian 노트로 내보내기")
     export.add_argument("--out", required=True, help="빈 폴더 또는 이전 내보내기 폴더 (예: <vault>/knowledge)")
+    walk_cmd=commands.add_parser('walk',help='로컬 Laya 반복 탐색; 방문 노드는 다음 후보에서 제외 (실험용)')
+    walk_cmd.add_argument('--request',help='탐색 JSON 파일; -는 stdin')
+    walk_cmd.add_argument('--paper',help='출발 논문 범위, 예: P04')
+    walk_cmd.add_argument('--start-node',help='출발 노드의 실제 id')
+    walk_cmd.add_argument('--goal-file',help='짧은 영어 목표 파일; -는 stdin')
+    walk_cmd.add_argument('--target-node',help='선택적 목적지 실제 id; 의미적 목표 달성 인증과 구분')
+    walk_cmd.add_argument('--max-hops',type=int,default=4)
+    walk_cmd.add_argument('--include-candidates',action='store_true')
     cards = commands.add_parser("build-cards", help="원문 근거 검색층과 정교한 지식 카드 그래프 구축")
     cards.add_argument("files", nargs="*")
     source = commands.add_parser("source", help="모델 호출 없이 원문 PDF 페이지 직접 읽기")
@@ -274,6 +282,25 @@ def main():
             import decision_cli
             result = {"decision-up": decision_cli.start, "decision-down": decision_cli.stop,
                       "decision-status": decision_cli.status}[args.command]()
+        elif args.command=='walk':
+            import decision_cli
+            if args.request:
+                if args.paper or args.start_node or args.goal_file or args.target_node or args.include_candidates or args.max_hops!=4:
+                    raise ValueError('Use --request alone or starting point with --goal-file')
+                payload=json.loads(sys.stdin.read() if args.request=='-' else Path(args.request).read_text())
+            else:
+                if bool(args.paper)==bool(args.start_node) or not args.goal_file:
+                    raise ValueError('Provide exactly one --paper or --start-node, with --goal-file')
+                payload={'goal':sys.stdin.read() if args.goal_file=='-' else Path(args.goal_file).read_text(),
+                         'max_hops':args.max_hops,'include_candidates':args.include_candidates}
+                if args.paper:payload['paper_id']=args.paper.upper()
+                else:payload['start_node_id']=args.start_node
+                if args.target_node:payload['target_node_id']=args.target_node
+            if not isinstance(payload,dict):raise ValueError('Walk request must be a JSON object')
+            if not owned_process():
+                start()
+                request('/kg/graph-ready',timeout=190)
+            result=decision_cli.navigation(payload)
         elif args.command == "select":
             import decision_cli
             if args.request:

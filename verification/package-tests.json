@@ -2,9 +2,9 @@
   "passed": true,
   "isolated_python": "3.12",
   "tests": {
-    "runtime_contracts": 33,
+    "runtime_contracts": 47,
     "packaging_contracts": 7,
-    "total": 40
+    "total": 54
   },
   "private_data_required_for_tests": false,
   "model_downloaded_for_tests": false,
@@ -17,5 +17,19 @@
     "raw traces",
     "hook trust state"
   ],
-  "tested_platform": "macOS arm64; GitHub Linux job pending"
+  "tested_platform": "macOS arm64 and GitHub Linux contracts passed",
+  "public_decision2_adapter_smoke": {
+    "passed": true,
+    "device": "mps",
+    "worker_identity_checked": true,
+    "source_evidence_checked": true,
+    "two_local_choices_with_feedback_checked": true,
+    "production_config_changed": false
+  },
+  "cli_help_without_runtime_startup": true,
+  "github_linux_ci": {
+    "conclusion": "success",
+    "tested_source_commit": "45460d79db64c095e8c0a5d8efdf38b944779df6",
+    "url": "https://github.com/FMsongX2/laya-graph-harness/actions/runs/37156250976"
+  }
 }

@@ -10,9 +10,10 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "runtime"))
@@ -177,29 +178,56 @@ def render(records):
     return {path.as_posix(): text for path, text in files.items()}
 
 
+def safe_target(out, name):
+    """Manifest and generated paths must stay within the owned, unsymlinked tree."""
+    if not isinstance(name,str) or not name or '\\' in name or ':' in name:
+        raise ValueError('Invalid export path')
+    relative=PurePosixPath(name)
+    if relative.is_absolute() or '..' in relative.parts or relative.as_posix()!=name or name==MANIFEST:
+        raise ValueError('Invalid export path')
+    target=out
+    for part in relative.parts:
+        target=target/part
+        if target.is_symlink():raise ValueError('Symlinked export path is not owned')
+    if not target.resolve().is_relative_to(out):raise ValueError('Export path leaves its root')
+    return target
+
+
 def write(out, files):
     """Replace the previous export it owns; refuse foreign folders and hand-edited notes."""
     out = Path(out).resolve()
     manifest_path = out / MANIFEST
     if out.exists() and any(out.iterdir()) and not manifest_path.exists():
         raise ValueError(f"{out} is not empty and was not created by this export; choose an empty or previous export folder")
-    previous = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {"files": {}}
-    if previous.get("format") not in (None, FORMAT):
+    if manifest_path.is_symlink():raise ValueError('Symlinked manifest path is not owned')
+    previous = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {"format":FORMAT,"files": {}}
+    if not isinstance(previous,dict) or previous.get("format") != FORMAT or not isinstance(previous.get('files'),dict):
         raise ValueError("Unknown export format in " + str(manifest_path))
+    old_targets={name:safe_target(out,name) for name in previous['files']}
+    targets={name:safe_target(out,name) for name in files}
+    if any(not isinstance(digest,str) or not re.fullmatch(r'[0-9a-f]{64}',digest) for digest in previous['files'].values()):
+        raise ValueError('Invalid exported file hash')
+    unowned=[name for name,target in targets.items() if target.exists() and name not in previous['files']]
+    if unowned:raise ValueError('Generated names would overwrite unowned notes: '+', '.join(unowned))
     edited = [name for name, digest in previous["files"].items()
-              if (out / name).exists() and sha((out / name).read_bytes()) != digest]
+              if old_targets[name].exists() and sha(old_targets[name].read_bytes()) != digest]
     if edited:
         raise ValueError("Exported notes were edited; move your changes to your own notes, then delete these files:\n"
                          + "\n".join(edited))
     for name in previous["files"]:
-        if name not in files and (out / name).exists(): (out / name).unlink()
+        if name not in files and old_targets[name].exists(): old_targets[name].unlink()
     digests = {}
     for name, text in sorted(files.items()):
-        target = out / name
+        target = targets[name]
         target.parent.mkdir(parents=True, exist_ok=True)
         raw = text.encode("utf-8")
-        temporary = target.with_name(target.name + ".tmp")
-        temporary.write_bytes(raw); temporary.replace(target)
+        fd,tempname=tempfile.mkstemp(prefix='.laya-write-',dir=target.parent)
+        temporary=Path(tempname)
+        try:
+            with os.fdopen(fd,'wb') as stream:stream.write(raw)
+            temporary.replace(target)
+        finally:
+            if temporary.exists():temporary.unlink()
         digests[name] = sha(raw)
     for folder in sorted({(out / name).parent for name in previous["files"]}, key=lambda p: len(p.parts), reverse=True):
         if folder != out and folder.is_dir() and not any(folder.iterdir()): folder.rmdir()

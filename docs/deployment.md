@@ -17,6 +17,9 @@ The current adapter expects the existing approved Cognee data contract:
 
 `knowledgegraph/config/*.example.json` describes configuration structure.
 `scripts/configure.py` creates ignored local copies without starting anything.
+The default backend is Laya. [Decision 2.0 setup](decision2.md) uses
+`decision2.example.json`, `requirements-decision2.txt` and a separately provisioned
+verified model package; model assets remain outside this repository.
 The standalone snapshot's default model layout is:
 
 ```text

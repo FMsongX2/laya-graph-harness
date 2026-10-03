@@ -12,6 +12,7 @@ knowledgegraph/kg export-obsidian --out <vault>/knowledge
 - Output: one note per assertion (statement, conditions, quoted evidence with PDF page/table coordinates, review provenance), per paper and per entity (reviewed aliases become Obsidian aliases), plus `README.md`.
 - Notes carry `scientific_truth_certified: false` and a callout: source review is not truth or performance certification.
 - Re-running replaces the previous export and removes notes whose records are gone. It refuses to write into a non-empty folder it did not create, and refuses while an exported note has been edited. Write your own thoughts in your own notes and link to exported ones.
+- Manifest paths must stay inside the export root. Symlinked output subpaths and new generated names that would overwrite unowned notes are refused before writes; temporary files use unique names.
 - Local PDF paths are not written; the export contains quotes, so keep the vault as private as the corpus.
 
 ## One vault with PersonaGraph
