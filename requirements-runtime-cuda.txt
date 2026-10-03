@@ -1,0 +1,4 @@
+# Runtime with CUDA BGE-M3 embeddings (settings.json embedding.device "auto" or "cuda").
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
+-r requirements-runtime.txt

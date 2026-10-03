@@ -6,12 +6,12 @@ from collections import Counter
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
+import queue
 import re
-import select
 import sqlite3
 import subprocess
+import threading
 import time
 import urllib.request
 
@@ -20,6 +20,7 @@ from neo4j import GraphDatabase, Query
 from neo4j.exceptions import ServiceUnavailable, SessionExpired
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
+import portable
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = json.loads((ROOT / 'config/decision.json').read_text())
@@ -57,6 +58,8 @@ class Worker:
         self.warmup_calls = 0
         self.warmed_pid = None
         self.warmup_seconds = None
+        self.lines = None
+        self.device = None
 
     def start(self):
         if self.proc and self.proc.poll() is None:
@@ -64,31 +67,51 @@ class Worker:
         self.close()
         lab = (ROOT / CONFIG['model_lab']).resolve()
         # Preserve the venv executable symlink: resolving it would lose its site-packages.
-        configured_python = ROOT / CONFIG['worker_python']
+        configured_python = portable.interpreter(ROOT / CONFIG['worker_python'])
         python = configured_python.parent.resolve() / configured_python.name
         adapter = lab / CONFIG['adapter']
         if not all(p.exists() for p in [python, lab / 'worker.py', lab / 'base-model', adapter / 'head.safetensors']):
             raise RuntimeError('Configured local Laya runtime/checkpoint is missing')
-        env = {k: os.environ[k] for k in ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR'] if k in os.environ}
+        env = portable.passthrough_environment(['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR'])
         env.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', TOKENIZERS_PARALLELISM='false')
         (ROOT / 'logs').mkdir(exist_ok=True)
         self.log = (ROOT / 'logs/decision-worker.log').open('a')
         t = time.perf_counter()
+        # Its own signal group: stopping the service must reach lifespan cleanup, not this pipe.
         self.proc = subprocess.Popen([str(python), str(lab / 'worker.py'), '--model', str(lab / 'base-model'),
-                                      '--head', str(adapter)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=self.log, text=True, bufsize=1, env=env)
+                                      '--head', str(adapter), '--device', CONFIG.get('device', 'auto'),
+                                      '--precision', CONFIG.get('precision', 'fp32')],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
+                                     text=True, encoding='utf-8', bufsize=1, env=env, **portable.isolated_child())
+        # Pipes cannot be polled with select() on Windows; one reader thread per worker pipe instead.
+        self.lines = queue.Queue()
+        threading.Thread(target=self.pump, args=(self.proc.stdout, self.lines), daemon=True).start()
         try:
-            ready = self.read()
+            ready = self.read(CONFIG.get('worker_load_timeout_seconds', CONFIG['worker_timeout_seconds']))
             if ready.get('ready') is not True:
                 raise RuntimeError('Local Laya worker did not become ready')
+            requested = CONFIG.get('device', 'auto')
+            # Laya silently falls back to CPU when CUDA is missing or out of memory.
+            if requested != 'auto' and requested.split(':')[0] != ready.get('device_type'):
+                raise RuntimeError('Local Laya worker is not on the configured device')
         except Exception:
             self.close(); raise
+        self.device = ready.get('device')
         self.load_seconds = time.perf_counter() - t
 
-    def read(self):
-        if not select.select([self.proc.stdout], [], [], CONFIG['worker_timeout_seconds'])[0]:
-            raise RuntimeError('Local Laya worker timed out')
-        line = self.proc.stdout.readline()
+    @staticmethod
+    def pump(stream, sink):
+        try:
+            for line in stream: sink.put(line)
+        except (OSError, ValueError):
+            pass
+        sink.put('')
+
+    def read(self, timeout=None):
+        try:
+            line = self.lines.get(timeout=CONFIG['worker_timeout_seconds'] if timeout is None else timeout)
+        except queue.Empty:
+            raise RuntimeError('Local Laya worker timed out') from None
         if not line:
             raise RuntimeError('Local Laya worker exited')
         try:
@@ -99,13 +122,13 @@ class Worker:
             raise RuntimeError('Local Laya worker rejected the request')
         return value
 
-    def evaluate(self, request):
+    def evaluate(self, request, timeout=None):
         self.start()
         t = time.perf_counter()
         try:
             self.proc.stdin.write(json.dumps(request, ensure_ascii=False) + '\n')
             self.proc.stdin.flush()
-            response = self.read()
+            response = self.read(timeout)
         except Exception:
             self.close(); raise
         self.calls += 1
@@ -121,7 +144,8 @@ class Worker:
                    'under the experimental conditions described by the source.'},
                    'questions': {'action': {'type': 'choice', 'instructions': INSTRUCTIONS,
                        'criteria': {f'c{i}': f'Method {i} | uses method | Evidence retrieval variant {i}' for i in range(8)}}}}
-        _, elapsed = self.evaluate(payload)
+        # The first CUDA forward initializes kernels/cuBLAS (about 15 s on an RTX 5080).
+        _, elapsed = self.evaluate(payload, CONFIG.get('worker_load_timeout_seconds', CONFIG['worker_timeout_seconds']))
         self.warmup_calls += 1
         self.warmed_pid = self.proc.pid
         self.warmup_seconds = elapsed
@@ -139,6 +163,7 @@ class Worker:
                         self.proc.kill(); self.proc.wait(timeout=5)
             self.proc.stdout.close()
             self.proc = None
+            self.lines = None
         if self.log:
             self.log.close(); self.log = None
 
@@ -147,7 +172,7 @@ class Graph:
     """Fixed read queries against the configured Cognee semantic dataset only."""
     def __init__(self):
         dataset = SETTINGS['knowledge']['semantic_dataset']
-        with sqlite3.connect(f'file:{ROOT}/state/system/databases/cognee_db?mode=ro', uri=True) as c:
+        with sqlite3.connect((ROOT / 'state/system/databases/cognee_db').as_uri() + '?mode=ro', uri=True) as c:
             row = c.execute('SELECT b.graph_database_url,b.graph_database_name,b.graph_database_connection_info '
                             'FROM dataset_database b JOIN datasets d ON d.id=b.dataset_id '
                             "WHERE d.name=? AND b.graph_database_provider='neo4j'", (dataset,)).fetchone()

@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import importlib.metadata
 import json
 import os
 from pathlib import Path
-import signal
 import shutil
 import sqlite3
 import socket
@@ -20,6 +18,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from runtime.environment import environment
+from runtime import portable
 from runtime.lifecycle import tracked_cli, status as lifecycle_status
 
 CONFIG = json.loads((ROOT / "config/settings.json").read_text())
@@ -93,15 +92,19 @@ def owned_process():
     if not STATE.exists():
         return None
     state = json.loads(STATE.read_text())
-    command = subprocess.run(["ps", "-p", str(state["pid"]), "-o", "command="],
-                             capture_output=True, text=True).stdout.strip()
+    command = portable.command_line(state["pid"])
     return state if str(ROOT / "runtime") in command and "uvicorn" in command else None
+
+
+def desktop_executable():
+    """Docker Desktop's default per-machine install location on Windows."""
+    path = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker/Docker/Docker Desktop.exe"
+    return str(path) if path.exists() else None
 
 
 def start():
     # Several agent sessions can reach the same lazy-start path concurrently.
-    with (ROOT / 'runtime/service-start.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with portable.locked(ROOT / 'runtime/service-start.lock'):
         return start_locked()
 
 
@@ -122,6 +125,14 @@ def start_locked():
                     if docker_ready():break
                     time.sleep(1)
                 else:raise RuntimeError("Docker Desktop did not become ready; start it and retry ./kg up")
+            elif portable.WINDOWS and desktop_executable():
+                subprocess.Popen([desktop_executable()], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, **portable.detached())
+                deadline = time.monotonic() + 120
+                while time.monotonic() < deadline:
+                    if docker_ready():break
+                    time.sleep(1)
+                else:raise RuntimeError("Docker Desktop did not become ready; start it and retry kg up")
             else:raise RuntimeError("Start the Docker daemon before ./kg up")
     state = owned_process()
     if state:
@@ -129,13 +140,13 @@ def start_locked():
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1", CONFIG["server"]["port"])) == 0:
             raise RuntimeError("Configured port is already occupied by another process")
-    command = [str(ROOT / ".venv/bin/python"), "-m", "uvicorn", "service:app", "--app-dir",
+    command = [str(portable.venv_python(ROOT / ".venv")), "-m", "uvicorn", "service:app", "--app-dir",
                str(ROOT / "runtime"), "--host", "127.0.0.1", "--port", str(CONFIG["server"]["port"]), "--workers", "1"]
     log_path = ROOT / "logs/service.log"
     log_path.parent.mkdir(exist_ok=True)
     with log_path.open("a") as log:
         child = subprocess.Popen(command, cwd=ROOT, env=environment(), stdin=subprocess.DEVNULL,
-                                 stdout=log, stderr=log, start_new_session=True)
+                                 stdout=log, stderr=log, **portable.detached())
     state = {"pid": child.pid, "command": command, "log": str(log_path), "started_at": time.time()}
     STATE.write_text(json.dumps(state, indent=2) + "\n")
     return wait_ready(state)
@@ -161,7 +172,7 @@ def stop():
     state = owned_process()
     if not state:
         return {"running": False}
-    os.kill(state["pid"], signal.SIGTERM)
+    portable.request_stop(state["pid"])
     for _ in range(60):
         if not owned_process():
             return {"running": False, "stopped_pid": state["pid"]}
@@ -172,15 +183,14 @@ def stop():
 def prepare():
     """Ready shared services once; subsequent skill uses reuse the same processes."""
     import decision_cli
-    with (ROOT / 'runtime/prepare.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with portable.locked(ROOT / 'runtime/prepare.lock'):
         started = time.perf_counter()
         knowledge = start()
         if knowledge['health'].get('knowledge_operation') in {'build', 'card-index', 'evidence-index', 'semantic-index'}:
             raise RuntimeError('KnowledgeGraph is building; prepare can resume after the existing build finishes')
         graph = request('/kg/graph-ready', timeout=190)
         decision_cli.start()
-        model = decision_cli.call('/warmup', {}, timeout=40)
+        model = decision_cli.call('/warmup', {}, timeout=decision_cli.WARMUP_TIMEOUT)
         if not graph.get('ready') or not model.get('ready') or not model.get('warmed'):
             raise RuntimeError('KnowledgeGraph/Laya preparation did not become ready')
         return {'ready': True, 'seconds': time.perf_counter() - started,
@@ -198,8 +208,7 @@ def paper_status():
     state = json.loads(process_file.read_text()) if process_file.exists() else None
     alive = False
     if state:
-        command = subprocess.run(["ps", "-p", str(state["pid"]), "-o", "command="],
-                                 capture_output=True, text=True).stdout
+        command = portable.command_line(state["pid"])
         alive = str(ROOT / "tools" / script) in command
     return {"worker_running": alive, "process": state,
             "progress": json.loads(progress.read_text()) if progress.exists() else None}
@@ -213,10 +222,10 @@ def start_papers(files=None):
     script = "build_cards.py" if CONFIG["knowledge"]["strategy"] == "knowledge_cards" else "index_fulltext.py"
     job = ROOT / ("state/fulltext-ingestion" if script == "index_fulltext.py" else "state/card-ingestion")
     job.mkdir(parents=True, exist_ok=True)
-    command = [str(ROOT / ".venv/bin/python"), str(ROOT / "tools" / script), *(files or [])]
+    command = [str(portable.venv_python(ROOT / ".venv")), str(ROOT / "tools" / script), *(files or [])]
     with (job / "worker.log").open("a") as log:
         worker = subprocess.Popen(command, cwd=ROOT, env=environment(), stdin=subprocess.DEVNULL,
-                                  stdout=log, stderr=log, start_new_session=True)
+                                  stdout=log, stderr=log, **portable.detached())
     process = {"pid": worker.pid, "command": command, "log": str(job / "worker.log")}
     if sys.platform == "darwin" and Path("/usr/bin/caffeinate").exists():
         guard = subprocess.Popen(["/usr/bin/caffeinate", "-i", "-w", str(worker.pid)],
@@ -316,7 +325,7 @@ def main():
                       "embedding_snapshot_exists": Path(CONFIG["embedding"]["snapshot"]).is_dir(),
                       "service_running": bool(owned_process())}
         elif args.command == "neo4j-info":
-            connection = sqlite3.connect(f"file:{ROOT}/state/system/databases/cognee_db?mode=ro", uri=True)
+            connection = sqlite3.connect((ROOT / "state/system/databases/cognee_db").as_uri() + "?mode=ro", uri=True)
             result = {"datasets": [{"name": name, "uri": uri, "database": database,
                          "handler": handler, "container": json.loads(info).get("container_name")}
                        for name, uri, database, handler, info in connection.execute(

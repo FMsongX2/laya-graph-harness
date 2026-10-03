@@ -12,13 +12,20 @@ from build_data import compact
 
 p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--head')
 p.add_argument('--relative-temperature',type=float,default=1)
-p.add_argument('--device',default='mps');args=p.parse_args()
+p.add_argument('--device',default='auto',help="auto = CUDA, else MPS, else CPU (Laya's own order)")
+# The head temperature was calibrated from fp32 one-row forwards (MPS keeps a single row in fp32);
+# CUDA would otherwise autocast to bf16/fp16 and shift the calibrated probabilities.
+p.add_argument('--precision',choices=['fp32','amp'],default='fp32');args=p.parse_args()
+# JSONL protocol is UTF-8 regardless of the Windows console code page.
+sys.stdin.reconfigure(encoding='utf-8');sys.stdout.reconfigure(encoding='utf-8')
 with contextlib.redirect_stdout(sys.stderr):
     import torch
     import laya
     from safetensors.torch import load_file
     torch.set_num_threads(4)
-    agent=laya.load(args.model,device=args.device)
+    agent=laya.load(args.model,device=None if args.device=='auto' else args.device)
+    if args.precision=='fp32':
+        agent.amp_enabled=False;agent.dtype=torch.float32
     agent.cfg.update(max_len=1536,head_max_len=512)
     if args.head:
         head=Path(args.head);config=json.loads((head/'head-config.json').read_text())
@@ -36,7 +43,9 @@ with contextlib.redirect_stdout(sys.stderr):
     def capture_forward(batch):
         result=original_forward(batch);captured.append(result[0].tolist());return result
     agent._forward=capture_forward
-print(json.dumps({'ready':True,'backend':'laya','device':str(agent.device)}),flush=True)
+print(json.dumps({'ready':True,'backend':'laya','device':str(agent.device),'device_type':agent.device.type,
+                  'precision':str(agent.dtype_for(1)).removeprefix('torch.'),
+                  'gpu':torch.cuda.get_device_name(agent.device) if agent.device.type=='cuda' else None}),flush=True)
 for line in sys.stdin:
     try:
         request=compact(json.loads(line));started=time.perf_counter()

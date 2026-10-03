@@ -47,6 +47,54 @@ Neo4j/APOC image with its included Dockerfile if provisioning that dependency:
 docker build -t knowledgegraph-neo4j:5.26.31-local knowledgegraph/config/neo4j
 ```
 
+## Windows and NVIDIA CUDA
+
+The runtime runs natively on Windows 10/11 with an NVIDIA GPU. No WSL is
+required; Neo4j still runs as a Linux container under Docker Desktop (WSL 2
+backend), which the CLI starts if it is installed in the default location.
+
+```powershell
+py -3.12 -m venv knowledgegraph\.venv
+knowledgegraph\.venv\Scripts\python -m pip install -r requirements-runtime-cuda.txt
+py -3.12 -m venv .venv-model
+.venv-model\Scripts\python -m pip install -r requirements-model-cuda.txt
+python scripts\fetch_laya.py
+knowledgegraph\kg.cmd prepare
+```
+
+- `kg.cmd` replaces `./kg` and enables Python UTF-8 mode; managed services
+  receive `PYTHONUTF8=1` too. Run any project script directly with
+  `PYTHONUTF8=1` (or `python -X utf8`), because JSON records are UTF-8.
+- The `*-cuda.txt` files pin `torch==2.7.1+cu128`, whose kernels include
+  Blackwell GPUs (RTX 50xx). Older GPUs work with the same wheels.
+- `decision.json` `worker_python` may keep the POSIX form
+  `../.venv-model/bin/python`; it maps to `Scripts\python.exe` on Windows.
+- `decision.json` `device`: `auto` (CUDA, else MPS, else CPU), `cuda`, `cuda:1`,
+  `mps` or `cpu`. An explicit device is enforced: Laya's silent CPU fallback
+  (missing CUDA, out of memory) makes the worker fail to start instead.
+- `decision.json` `precision` defaults to `fp32`. The head temperature was
+  calibrated from fp32 one-row forwards, and Laya would otherwise autocast to
+  bf16 on CUDA. `amp` is faster but must be re-validated against labels before
+  the 0.95 review threshold is trusted.
+- `settings.json` `embedding.device`: `cpu` reproduces the original float32
+  BGE-M3 vectors exactly; `auto`/`cuda` embeds on the GPU (float32, numerically
+  equivalent up to rounding).
+- Graceful stop sends CTRL_BREAK to the service's own process group (uvicorn
+  drains requests and runs lifespan cleanup); idle force-release terminates the
+  owned process tree. Locks use `LockFileEx` with the same shared/exclusive
+  lease semantics as `flock`.
+- CUDA torch wheels contain header paths of about 130 characters. Keep the
+  project root short (the venv path must stay under Windows' 260-character
+  limit) or enable `LongPathsEnabled`; otherwise pip fails with
+  `No such file or directory` for a `torch\include\ATen\ops\...` file.
+- The first CUDA forward initializes kernels and takes about 15 s (RTX 5080);
+  warm calls take about 15 ms. Warmup therefore uses
+  `worker_load_timeout_seconds` instead of the per-request timeout.
+- Paper ingestion calls Poppler's `pdftotext`; install a Windows Poppler build
+  (for example `scoop install poppler` or `conda install poppler`) on `PATH`.
+- macOS' `caffeinate` sleep guard for long ingestion has no Windows
+  counterpart here; disable sleep in power settings for long builds.
+
 Creating, restoring or migrating a dataset is a separate operation. This
 repository does not include private state, a paper corpus or trained weights,
 and an empty clone cannot reproduce the reported empirical accuracy.

@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 import json
 import os
 import sys
-import fcntl
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from cli import request
+from runtime import portable
 CONFIG = json.loads((ROOT / "config/settings.json").read_text())
 JOB = ROOT / "state/fulltext-ingestion"
 
@@ -24,7 +24,7 @@ def save(name, value):
 def run():
     JOB.mkdir(parents=True, exist_ok=True)
     with (JOB / "worker.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        portable.lock(lock, blocking=False)
         manifest = json.loads((ROOT / "state/paper-ingestion/manifest.json").read_text())
         dataset = CONFIG["knowledge"]["evidence_dataset"]
         state = {"strategy": "fulltext", "dataset": dataset, "status": "registering",
@@ -88,7 +88,7 @@ def verify():
 def wait_existing():
     JOB.mkdir(parents=True, exist_ok=True)
     with (JOB / "worker.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        portable.lock(lock, blocking=False)
         state = json.loads((JOB / "progress.json").read_text())
         state["worker_pid"] = os.getpid(); save("progress.json", state)
         while True:

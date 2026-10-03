@@ -4,23 +4,24 @@ Dataset, secret, model, settings and runtime state files are never copied.
 """
 import argparse
 from datetime import datetime, timezone
-import fcntl
 import json
 from pathlib import Path
 import shutil
 import socket
-import subprocess
+import sys
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'knowledgegraph'))
+from runtime import portable
 
 def source_files():
     kg=ROOT/'knowledgegraph'
-    return [kg/'kg',*sorted((kg/'runtime').glob('*.py')),*sorted((kg/'tools').glob('*.py'))]
+    return [kg/'kg',kg/'kg.cmd',*sorted((kg/'runtime').glob('*.py')),*sorted((kg/'tools').glob('*.py'))]
 
 def process_alive(path):
     if not path.exists():return False
     state=json.loads(path.read_text())
-    return subprocess.run(['ps','-p',str(state['pid']),'-o','command='],capture_output=True,text=True).stdout.strip()!=''
+    return portable.command_line(state['pid'])!=''
 
 def install(target,apply=False):
     target=Path(target).expanduser().resolve();kg=ROOT/'knowledgegraph'
@@ -33,7 +34,7 @@ def install(target,apply=False):
     if not apply:return plan
     control=target/'runtime/lifecycle';control.mkdir(exist_ok=True)
     with (control/'activity.lock').open('a') as lease:
-        try:fcntl.flock(lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        try:portable.lock(lease,blocking=False)
         except BlockingIOError:raise RuntimeError('Target has active runtime work; stop it before installation') from None
         for state in [target/'runtime/service-process.json',target/'runtime/decision-process.json',control/'process.json']:
             if process_alive(state):raise RuntimeError('Stop target services and its idle watcher before installing the overlay')

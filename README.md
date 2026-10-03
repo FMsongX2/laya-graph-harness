@@ -34,6 +34,18 @@ python3.12 -m venv .venv-test
 .venv-test/bin/python scripts/check_export.py
 ```
 
+Windows 10/11 (PowerShell), same Python 3.12:
+
+```powershell
+py -3.12 -m venv .venv-test
+$env:PYTHONUTF8 = '1'
+.venv-test\Scripts\python -m pip install -r requirements-test.txt
+.venv-test\Scripts\python scripts/configure.py
+.venv-test\Scripts\python -m unittest discover -s knowledgegraph/tests -p 'test_*.py' -v
+.venv-test\Scripts\python -m unittest discover -s tests -p 'test_*.py' -v
+.venv-test\Scripts\python scripts/check_export.py
+```
+
 The generated `knowledgegraph/config/settings.json` and `decision.json` are
 ignored local files. Example configuration is sufficient for the synthetic
 contract tests. It is not sufficient to start real inference or graph search.

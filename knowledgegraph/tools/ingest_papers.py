@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-import fcntl
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -17,6 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from cli import request
+from runtime import portable
 
 CORPUS = ROOT / "data/hackerton-papers"
 JOB = ROOT / "state/paper-ingestion"
@@ -204,7 +204,7 @@ def verify(manifest):
 def run(manifest):
     JOB.mkdir(parents=True, exist_ok=True)
     with (JOB / "worker.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        portable.lock(lock, blocking=False)
         progress_path = JOB / "progress.json"
         progress = json.loads(progress_path.read_text()) if progress_path.exists() else {
             "created_at": now(), "dataset": manifest["dataset"], "papers": {}}

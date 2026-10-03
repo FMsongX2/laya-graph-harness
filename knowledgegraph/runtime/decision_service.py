@@ -34,6 +34,7 @@ async def health():
     ready = worker.proc is not None and worker.proc.poll() is None
     return {'service': 'knowledgegraph-decision', 'ready': ready, 'busy': app.state.lock.locked(),
             'worker_pid': worker.proc.pid if ready else None, 'worker_load_seconds': worker.load_seconds,
+            'worker_device': worker.device if ready else None,
             'warmed': ready and worker.warmed_pid == worker.proc.pid, 'worker_warmup_seconds': worker.warmup_seconds,
             'warmup_model_calls': worker.warmup_calls, 'local_model_calls': worker.calls - worker.warmup_calls,
             'task': 'source_relationship', 'candidate_count': CONFIG['candidate_count'],

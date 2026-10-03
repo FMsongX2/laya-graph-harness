@@ -23,7 +23,8 @@
     "snapshot": "models/bge-m3",
     "dimensions": 1024,
     "max_tokens": 8192,
-    "cpu_threads": 4
+    "cpu_threads": 4,
+    "device": "auto"
   },
   "cognee": {
     "version": "1.6.2",

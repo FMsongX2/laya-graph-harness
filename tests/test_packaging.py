@@ -47,10 +47,8 @@ class OverlayContract(unittest.TestCase):
             with self.assertRaises(RuntimeError):installer.install(self.target,True)
         self.assertEqual((self.target/'runtime/decision_engine.py').read_text(),'original code sentinel')
     def test_active_lease_refuses_installation(self):
-        import fcntl
         directory=self.target/'runtime/lifecycle';directory.mkdir()
-        with (directory/'activity.lock').open('a') as lease:
-            fcntl.flock(lease,fcntl.LOCK_SH)
+        with installer.portable.locked(directory/'activity.lock',shared=True):
             with self.assertRaises(RuntimeError):installer.install(self.target,True)
         self.assertEqual((self.target/'runtime/decision_engine.py').read_text(),'original code sentinel')
 

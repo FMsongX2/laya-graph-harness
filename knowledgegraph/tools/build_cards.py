@@ -2,7 +2,6 @@
 from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import json
 import os
@@ -22,6 +21,7 @@ os.environ.update(runtime_environment)
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "runtime"))
 from cli import request
+from runtime import portable
 from card_models import ClaimBatch, CardPlans, ClaimAudits
 from paper_chunker import split_exact, tokenizer
 
@@ -250,7 +250,7 @@ def successful(result):
 def run(args):
     JOB.mkdir(parents=True, exist_ok=True)
     with (JOB / "worker.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        portable.lock(lock, blocking=False)
         sources = load_sources(args.files)
         if args.paper: sources = [source for source in sources if source["source_id"] in args.paper]
         if args.limit: sources = sources[:args.limit]
