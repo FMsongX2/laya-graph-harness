@@ -1,0 +1,44 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18341
+  },
+  "default_dataset": "domain_semantic",
+  "knowledge": {
+    "strategy": "semantic_with_evidence",
+    "cards_dataset": "domain_cards",
+    "evidence_dataset": "paper_evidence",
+    "semantic_dataset": "domain_semantic",
+    "map_tokens": 5000,
+    "legacy_dataset": "domain_knowledge"
+  },
+  "chat": {
+    "model": "configure-your-local-model:latest",
+    "upstream": "http://127.0.0.1:11434",
+    "temperature": 0,
+    "max_output_tokens": 4096
+  },
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "snapshot": "models/bge-m3",
+    "dimensions": 1024,
+    "max_tokens": 8192,
+    "cpu_threads": 4
+  },
+  "cognee": {
+    "version": "1.6.2",
+    "chunk_size": 512,
+    "provenance_tracking": true,
+    "graph_prompt_path": "config/graph-extraction.txt"
+  },
+  "logging": {
+    "request_payloads": false
+  },
+  "graph": {
+    "provider": "neo4j",
+    "dataset_handler": "neo4j_community",
+    "image": "knowledgegraph-neo4j:5.26.31-local",
+    "max_running_containers": 2,
+    "encryption_key_file": "config/neo4j-secret.json"
+  }
+}

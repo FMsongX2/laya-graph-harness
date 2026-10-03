@@ -1,0 +1,5 @@
+{
+  "idle_timeout_seconds": 900,
+  "poll_seconds": 15,
+  "stop_owned_neo4j_containers": true
+}

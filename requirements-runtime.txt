@@ -1,0 +1,7 @@
+-r requirements-test.txt
+cognee==1.6.2
+fastapi==0.142.2
+uvicorn==0.54.0
+httpx==0.28.1
+numpy==2.5.3
+sentence-transformers==5.7.0

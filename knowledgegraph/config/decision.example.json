@@ -1,0 +1,13 @@
+{
+  "port": 18342,
+  "model_lab": "../model-worker",
+  "worker_python": "../.venv-model/bin/python",
+  "adapter": "trained",
+  "candidate_count": 8,
+  "paper_pool_limit": 2000,
+  "review_threshold": 0.95,
+  "worker_timeout_seconds": 30,
+  "max_batch_items": 16,
+  "max_evidence": 8,
+  "max_conditions": 32
+}

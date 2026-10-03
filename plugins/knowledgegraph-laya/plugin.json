@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "knowledgegraph-laya",
+  "version": "0.2.0",
+  "description": "Local bounded Neo4j source-relationship selection through one CLI call and a resident Laya worker.",
+  "author": {
+    "name": "FMsongX2"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "KnowledgeGraph Laya",
+        "shortDescription": "Local graph evidence selection",
+        "longDescription": "Select relationships from a short English paper excerpt, preserving source evidence and conditions. Uses the local KnowledgeGraph CLI and resident Laya worker.",
+        "developerName": "FMsongX2",
+        "category": "Productivity",
+        "defaultPrompt": "Find the source-linked relationship and its conditions for this paper excerpt."
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "isolated_python": "3.12",
+  "tests": {
+    "runtime_contracts": 33,
+    "packaging_contracts": 7,
+    "total": 40
+  },
+  "private_data_required_for_tests": false,
+  "model_downloaded_for_tests": false,
+  "skill_format_valid": true,
+  "source_compilation_passed": true,
+  "publication_assets_exclude": [
+    "corpus",
+    "weights",
+    "credentials",
+    "raw traces",
+    "hook trust state"
+  ],
+  "tested_platform": "macOS arm64; GitHub Linux job pending"
+}

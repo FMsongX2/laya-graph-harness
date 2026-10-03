@@ -1,0 +1,3 @@
+#!/bin/sh
+kg_project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$kg_project_dir/.venv/bin/python" "$kg_project_dir/tools/cli.py" "$@"

@@ -1,0 +1,82 @@
+{
+  "measured_on": "2026-10-03",
+  "hardware": "Apple M5 Pro, 48 GiB unified memory",
+  "agent_model": "gpt-6-luna",
+  "reasoning_effort": "high",
+  "agent_latency_pilot": {
+    "cases": 10,
+    "paper_groups": 5,
+    "arms": {
+      "direct": {
+        "cases": 10,
+        "correct": 9,
+        "median_seconds": 12.333928187500533,
+        "min_seconds": 11.900088958998822,
+        "max_seconds": 19.392060874999515,
+        "median_shell_calls": 2.0,
+        "median_input_tokens": 58553.5,
+        "median_output_tokens": 308.5
+      },
+      "assisted": {
+        "cases": 10,
+        "correct": 10,
+        "median_seconds": 9.074430333000237,
+        "min_seconds": 7.935091834000559,
+        "max_seconds": 14.446145875001093,
+        "median_shell_calls": 1.0,
+        "median_input_tokens": 38194.5,
+        "median_output_tokens": 218.5
+      },
+      "local_only_warm": {
+        "cases": 10,
+        "repeats": 3,
+        "correct": 10,
+        "median_seconds": 0.07682779199967626,
+        "median_model_seconds": 0.056479541499356856
+      }
+    },
+    "median_paired_saved_seconds": 3.7860162289989603,
+    "limitations": [
+      "Small latency pilot on ten previously tested source excerpts from five papers; not a general accuracy benchmark.",
+      "Paper-scoped eight-candidate one-step selection with evidence read; no learned STOP or unrestricted multi-hop search.",
+      "Model and high reasoning effort follow the local CLI configuration, not necessarily this desktop conversation model.",
+      "Warm local selector is a service; each Codex path includes fresh CLI startup and remote model/tool/final-answer latency.",
+      "Known exact citation links are deliberately not used to choose candidates; production should use deterministic lookup first.",
+      "One run per agent arm; remote load, cache, and latency noise are not statistically controlled."
+    ]
+  },
+  "live_selector": {
+    "live_cases": 150,
+    "correct": 124,
+    "same_selected_nodes_as_previous_live_test": 150,
+    "needs_review_cases": 135,
+    "median_laya_pipeline_seconds": 0.10359541700017871,
+    "median_model_seconds": 0.08893575000001874,
+    "median_exact_pipeline_seconds": 0.00689081200016517,
+    "exact_source_link_set_coverage": 150,
+    "median_full_cli_seconds": 0.11748166699908325
+  },
+  "lifecycle": {
+    "passed": true,
+    "concurrent_prepare_calls": 6,
+    "one_knowledge_process": true,
+    "one_laya_worker": true,
+    "one_idle_watcher": true,
+    "warmup_not_repeated": true,
+    "idle_timeout_seconds": 900,
+    "idle_test_method": "Aged activity marker to exceed the unchanged production timeout",
+    "model_worker_exited": true,
+    "all_registered_neo4j_containers_stopped": true,
+    "valid_selection_after_cold_restore": true,
+    "volumes_deleted": false,
+    "shared_docker_ollama_stopped": false
+  },
+  "artifacts_omitted": [
+    "corpus",
+    "trained weights",
+    "credentials",
+    "raw traces",
+    "user hook trust state"
+  ],
+  "scope": "Bounded English source-to-relationship selection; not unrestricted navigation or learned STOP/BACK."
+}

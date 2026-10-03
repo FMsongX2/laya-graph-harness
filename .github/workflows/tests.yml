@@ -1,0 +1,19 @@
+name: tests
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-test.txt
+      - run: python scripts/configure.py
+      - run: python -m unittest discover -s knowledgegraph/tests -p 'test_*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - run: python scripts/check_export.py
