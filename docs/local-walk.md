@@ -41,3 +41,34 @@ two Laya calls; graph counts and evidence coordinates were checked. These figure
 exclude cold loading and do not establish goal relevance or superiority over the
 earlier single-step timing. No private graph IDs, source quotations or traces are
 included in this reusable package.
+
+An additional paired pilot on 2026-10-04 used six predeclared two-hop goals from
+the installed graph. Both arms shared production candidate ranking, visited
+filtering, current-node and recent-evidence payloads, and a two-hop limit. The
+direct agent continued within one session across hops. The delegated agent made
+one tool call for the entire local walk. Both used `gpt-6-luna/high` with warm
+local resources; agent times include fresh CLI startup and identifier-only final
+output. Gold routes were held only by the evaluator and were not injected into
+runtime candidates or `target_node_id`.
+
+| Arm | Median elapsed time | Goal-evidence arrival |
+| --- | ---: | ---: |
+| Agent chooses each step | 15.127 s | 6/6 |
+| Agent delegates the full walk | 9.897 s | 3/6 |
+| Warm local walk alone | 0.144 s pipeline / 0.148 s HTTP | 3/6 |
+
+All three misses had the correct candidate available but selected a different
+second-step relationship. The arm-median time reduction was 34.6%; this is not a
+quality-preserving speedup over all tasks. In the three cases where both arms
+reached the goal, paired time savings had a median of 2.763 s (range 0.432–9.656 s).
+The 18 local runs repeated the same paths, and all 12 agent protocols were valid.
+Live node/edge counts remained unchanged.
+
+This supports the latency benefit of eliminating intermediate remote choices
+within this pilot. It also shows that the current source-to-relationship model
+needs improved goal-navigation quality before promoting the walk to a general
+default. Keep the walk experimental. The pilot used manually authored goals
+that name the intermediate method, one agent run per case/arm with alternating
+order, and three local repeats. It does not establish general accuracy,
+statistical significance, discovery quality, final-answer quality or cold-start
+performance. Raw private corpus/graph traces remain in the installed project.
