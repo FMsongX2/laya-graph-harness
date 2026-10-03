@@ -38,7 +38,16 @@ case "${1:-serve}" in
     # Services start lazily on the next kg call and stop after the idle timeout.
     # On container stop, release them (and the owned Neo4j containers) through the same
     # lease-respecting cleanup; it declines while work is active.
-    trap 'cd "$KG" && "$PY" -c "from runtime import lifecycle; print(lifecycle.cleanup_if_idle(idle_timeout=0))"; exit 0' TERM INT
+    shutdown() {
+      # A refused cleanup must not immediately exit and kill active container jobs.
+      # Docker's stop_grace_period still bounds how long it will allow this drain.
+      cd "$KG"
+      while ! "$PY" -c 'import json,sys; from runtime import lifecycle; r=lifecycle.cleanup_if_idle(idle_timeout=0); print(json.dumps(r),flush=True); sys.exit(0 if r.get("cleaned") else 1)'; do
+        sleep 1
+      done
+      exit 0
+    }
+    trap shutdown TERM INT
     echo "Ready for: docker compose exec harness kg select --request /data/laya/<request>.json"
     sleep infinity &
     wait

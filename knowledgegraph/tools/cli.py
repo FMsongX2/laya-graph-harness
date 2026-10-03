@@ -255,6 +255,8 @@ def main():
     select_cmd.add_argument("--excerpt-file", help="영어 원문 60~1000자 파일; -는 stdin")
     select_cmd.add_argument("--policy", choices=["auto", "laya", "model"], default="auto")
     select_cmd.add_argument("--include-candidates", action="store_true")
+    export = commands.add_parser("export-obsidian", help="승인된 근거를 읽기 전용 Obsidian 노트로 내보내기")
+    export.add_argument("--out", required=True, help="빈 폴더 또는 이전 내보내기 폴더 (예: <vault>/knowledge)")
     walk_cmd=commands.add_parser('walk',help='로컬 Laya 반복 탐색; 방문 노드는 다음 후보에서 제외 (실험용)')
     walk_cmd.add_argument('--request',help='탐색 JSON 파일; -는 stdin')
     walk_cmd.add_argument('--paper',help='출발 논문 범위, 예: P04')
@@ -335,6 +337,9 @@ def main():
         elif args.command == "build-cards":
             raise RuntimeError("Knowledge-card generation is inactive; the selected strategy is complete original text")
         elif args.command == "papers-status": result = paper_status()
+        elif args.command == "export-obsidian":
+            from export_obsidian import export
+            result = export(args.out)
         elif args.command == "semantic-status":
             result = json.loads((ROOT / "state/semantic-ingestion/progress.json").read_text())
         elif args.command == "source":

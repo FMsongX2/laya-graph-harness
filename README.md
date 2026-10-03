@@ -62,6 +62,9 @@ docker compose exec harness kg select --request /data/laya/requests/example.json
 See [Docker deployment](docs/docker.md) and
 [deployment prerequisites](docs/deployment.md).
 
+To browse reviewed knowledge in Obsidian (optionally beside PersonaGraph notes),
+see [Obsidian view](docs/obsidian.md): `kg export-obsidian --out <vault>/knowledge`.
+
 ## Run the tests without models or private data
 
 Python 3.12 on macOS or Linux:

@@ -69,9 +69,11 @@ Decision weights automatically.
   `docker compose --profile ollama up -d`. With Docker Desktop, a host-installed
   Ollama is reached at `http://host.docker.internal:11434`; set
   `chat.upstream` in `settings.json` accordingly.
-- **Lifecycle:** unchanged from native runs. Services start lazily, idle out
+- **Lifecycle:** services start lazily, idle out
   after `lifecycle.json`'s timeout and restart on the next `kg` call. Stopping
-  the container runs the same lease-respecting cleanup, so it never interrupts
-  active work and stops only the Neo4j containers this registry owns.
+  the container retries lease-respecting cleanup until active work drains and
+  stops only the Neo4j containers this registry owns. Docker's `stop_grace_period`
+  still bounds shutdown: requests longer than that grace may be force-terminated
+  by Docker. Increase the grace for long jobs; volumes are not deleted.
 - **GPU:** `decision.json` `device`/`precision` and `settings.json`
   `embedding.device` apply as in [deployment](deployment.md#windows-and-nvidia-cuda).
