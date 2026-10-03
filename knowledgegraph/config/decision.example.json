@@ -1,5 +1,6 @@
 {
   "port": 18342,
+  "backend": "laya",
   "model_lab": "../model-worker",
   "worker_python": "../.venv-model/bin/python",
   "adapter": "trained",

@@ -13,6 +13,13 @@ from runtime import lifecycle
 
 
 class LeaseContract(unittest.TestCase):
+    def test_cli_help_does_not_acquire_a_lease_or_start_a_watcher(self):
+        for command in ['select','walk','prepare','decision-down']:
+            with patch.object(lifecycle.sys,'argv',['kg',command,'--help']), \
+                 patch.object(lifecycle,'Lease') as lease,patch.object(lifecycle,'ensure_watcher') as watcher:
+                self.assertEqual(lifecycle.tracked_cli(lambda:'help')(),'help')
+                lease.assert_not_called();watcher.assert_not_called()
+
     def test_live_lease_prevents_cleanup_even_at_expired_deadline(self):
         with tempfile.TemporaryDirectory() as d:
             with patch.object(lifecycle,'LOCK',Path(d)/'lock'), patch.object(lifecycle,'LAST_USE',Path(d)/'last'):

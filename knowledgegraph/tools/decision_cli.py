@@ -95,3 +95,13 @@ def selection(payload):
         if health.get('service') != 'knowledgegraph-decision':
             raise RuntimeError('Selection port belongs to another service')
     return call('/select-batch' if 'items' in payload else '/select', payload)
+
+
+def navigation(payload):
+    try:health=call('/health',timeout=2)
+    except RuntimeError:start()
+    else:
+        if health.get('service')!='knowledgegraph-decision':raise RuntimeError('Selection port belongs to another service')
+        if not health.get('experimental_semantic_walk'):
+            raise RuntimeError('Running service predates /walk; restart the idle decision service to load the new code')
+    return call('/walk',payload,timeout=690)

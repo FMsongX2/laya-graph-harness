@@ -21,6 +21,7 @@ knowledgegraph/runtime/*manifest.json
 model-worker/vendor/
 model-worker/base-model/
 model-worker/trained/
+model-worker/models/
 *.safetensors
 *.bin
 *.pt

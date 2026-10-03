@@ -1,0 +1,18 @@
+{
+  "port": 18342,
+  "backend": "decision2",
+  "worker_python": "../.venv-decision2/bin/python",
+  "decision2": {
+    "model": "../model-worker/models/Sol-2B",
+    "device": "mps",
+    "threads": 4,
+    "mps_memory_fraction": 0.5
+  },
+  "candidate_count": 8,
+  "paper_pool_limit": 2000,
+  "review_threshold": 0.95,
+  "worker_timeout_seconds": 60,
+  "max_batch_items": 16,
+  "max_evidence": 8,
+  "max_conditions": 32
+}

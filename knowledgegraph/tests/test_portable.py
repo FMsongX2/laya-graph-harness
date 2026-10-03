@@ -81,7 +81,7 @@ import argparse, json, sys, time
 p = argparse.ArgumentParser(); p.add_argument('--model'); p.add_argument('--head')
 p.add_argument('--device'); p.add_argument('--precision'); args = p.parse_args()
 sys.stdin.reconfigure(encoding='utf-8'); sys.stdout.reconfigure(encoding='utf-8')
-print(json.dumps({'ready': True, 'device': 'cpu', 'device_type': 'cpu', 'args': [args.device, args.precision]}), flush=True)
+print(json.dumps({'ready': True, 'backend': 'laya', 'device': 'cpu', 'device_type': 'cpu', 'args': [args.device, args.precision]}), flush=True)
 for line in sys.stdin:
     request = json.loads(line)
     if request.get('hang'): time.sleep(30)

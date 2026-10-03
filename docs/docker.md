@@ -9,6 +9,7 @@ checks that private paths stay out of the build context.
 
 - Docker Engine with Compose v2.24+ (Linux), or Docker Desktop with the WSL 2
   backend (Windows) / Docker Desktop (macOS, CPU only).
+- On Docker Desktop, enable host networking in its settings (Desktop 4.34+).
 - NVIDIA GPU: driver 570+ and the NVIDIA Container Toolkit (Linux). Docker
   Desktop on Windows passes the GPU through WSL 2 without extra setup.
 - Disk: about 9 GB for the CUDA image, 3 GB for the CPU image.
@@ -49,6 +50,12 @@ docker compose down                        # releases services and owned Neo4j c
 
 CPU-only hosts use the override: `docker compose -f compose.yaml -f compose.cpu.yaml up -d`.
 `LAYA_PREPARE=0` skips the eager `kg prepare`; services then start on first use.
+
+The supplied image provisions the Laya environment. A Decision 2.0 configuration
+requires a separately built/provisioned model environment matching its configured
+`worker_python` and a complete trusted package under the mounted `models/` tree;
+see [Decision 2.0 setup](decision2.md). It does not fall back to Laya or install
+Decision weights automatically.
 
 ## How it fits together
 

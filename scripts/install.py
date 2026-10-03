@@ -112,16 +112,24 @@ def check():
              ('required', 'settings.json', settings is not None, 'python scripts/configure.py, then edit it'),
              ('required', 'decision.json', decision is not None, 'python scripts/configure.py')]
     if decision:
-        lab = (KG / decision['model_lab']).resolve()
-        head = lab / decision['adapter']
         python = KG / decision['worker_python']
         if WINDOWS and python.parent.name == 'bin': python = python.parent.parent / 'Scripts/python.exe'
-        items += [('required', 'model environment', python.exists(), 'python scripts/install.py'),
-                  ('required', 'pinned Laya source', (lab / 'vendor/laya/laya').is_dir(), 'python scripts/fetch_laya.py'),
+        backend=decision.get('backend','laya')
+        items += [('required','model environment',python.exists(),
+                   'see docs/decision2.md' if backend=='decision2' else 'python scripts/install.py')]
+        if backend=='decision2':
+            package=KG/(decision.get('decision2') or {}).get('model','missing-package')
+            items += [('required','Decision 2.0 package',(package/'MODEL_MANIFEST.json').is_file(),
+                       'private trusted package: see docs/decision2.md')]
+        elif backend=='laya':
+            lab = (KG / decision['model_lab']).resolve()
+            head = lab / decision['adapter']
+            items += [('required', 'pinned Laya source', (lab / 'vendor/laya/laya').is_dir(), 'python scripts/fetch_laya.py'),
                   ('required', 'Laya base model', (lab / 'base-model/model.safetensors').exists(),
                    'private asset: model-worker/base-model (see docs/deployment.md)'),
                   ('required', 'trained Laya head', (head / 'head.safetensors').exists() and (head / 'head-config.json').exists(),
                    'private asset: model-worker/trained/head.safetensors + head-config.json')]
+        else:items += [('required','supported model backend',False,'use laya or decision2')]
     if settings:
         snapshot = Path(settings['embedding']['snapshot'])
         snapshot = snapshot if snapshot.is_absolute() else KG / snapshot
@@ -159,12 +167,15 @@ def install(args):
                          'CUDA torch headers would exceed 260 characters. Move the project or enable LongPathsEnabled.')
     flavor = torch_flavor(device)
     environment(KG / '.venv', 'requirements-runtime.txt', flavor, args.python, args.dry_run)
-    if not args.skip_model:
+    decision=load(KG/'config/decision.json') or {}
+    if not args.skip_model and decision.get('backend','laya')=='laya':
         environment(ROOT / '.venv-model', 'requirements-model.txt', flavor, args.python, args.dry_run)
         if not args.dry_run:
             sys.path.insert(0, str(ROOT / 'scripts'))
             import fetch_laya
             say('ok', f'Laya source at {fetch_laya.fetch().relative_to(ROOT)}')
+    elif decision.get('backend')=='decision2':
+        say('skip','Decision 2.0 environment/package provisioning follows docs/decision2.md; Laya assets are not required')
     if not args.dry_run:
         sys.path.insert(0, str(ROOT / 'scripts'))
         import configure

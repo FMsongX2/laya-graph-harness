@@ -55,6 +55,17 @@ class ImageContextContract(unittest.TestCase):
             if '*' not in copied and copied!='.':self.assertFalse(dockerignore_excludes(copied),copied)
 
 class InstallerContract(unittest.TestCase):
+    def test_decision2_check_does_not_require_laya_only_config_or_assets(self):
+        with tempfile.TemporaryDirectory() as d:
+            kg=Path(d)/'knowledgegraph';(kg/'config').mkdir(parents=True)
+            (kg/'config/decision.json').write_text(json.dumps({'backend':'decision2','worker_python':'missing/python',
+                'decision2':{'model':'model-package'}}),encoding='utf-8')
+            lines=[]
+            with patch.object(installer,'KG',kg),patch.object(installer,'say',lambda status,msg:lines.append((status,msg))):
+                self.assertFalse(installer.check())
+            self.assertTrue(any('Decision 2.0 package' in message for _,message in lines))
+            self.assertFalse(any('Laya head' in message or 'Laya base' in message for _,message in lines))
+
     def test_torch_pin_follows_model_requirements(self):
         self.assertRegex(installer.pinned_torch(),r'^\d+\.\d+\.\d+$')
     def test_cuda_uses_blackwell_capable_wheels(self):
