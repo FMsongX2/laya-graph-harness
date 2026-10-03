@@ -3,7 +3,7 @@
 `kg walk --request request.json` / `POST /walk` repeats a local loop:
 
 ```text
-current node -> reviewed relation candidates -> Laya choice
+current node -> reviewed relation candidates -> configured local model choice
   -> verify/read evidence and conditions -> build the next observed state -> repeat
 ```
 
@@ -83,9 +83,12 @@ goal/current-node/recent-evidence/choice-menu input to the new provider and retu
 the selected offered key, probabilities and truncation information in the current
 worker contract. Graph IDs and evidence provenance remain under the loop's control.
 
-The installed provider is still Laya. Connecting a future model requires checking
-its actual API and output contract, then rerunning matched goal/evidence and
-latency comparisons. If an adapter makes remote calls, update the current
+Laya is the default; an [optional Decision 2.0 provider](decision2.md) now implements
+the same local worker contract. Sol was measured on CUDA and MPS, and the authored
+public adapter also passed a live MPS source/proof and two-choice feedback smoke.
+See [the separate timing/quality tables](measurements.md). Connecting another
+model requires checking its actual API/output contract and matching comparisons.
+If a future adapter makes remote calls, update the current
 local-only call counts and timing metadata to reflect that execution. Preserve
 this substitution point without committing the architecture to an unreleased
 model or presuming that its latency or navigation quality will be better.

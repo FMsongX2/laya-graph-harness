@@ -38,7 +38,7 @@ class SelectionRequest(BaseModel):
     task: Literal['source_relationship'] = 'source_relationship'
     paper_id: str = Field(pattern=r'^P\d{2}$')
     source_excerpt: str = Field(min_length=60, max_length=1000)
-    policy: Literal['auto', 'laya'] = 'auto'
+    policy: Literal['auto', 'laya', 'model'] = 'auto'
     include_candidates: bool = False
 
 
@@ -57,46 +57,73 @@ class Worker:
         self.warmup_calls = 0
         self.warmed_pid = None
         self.warmup_seconds = None
+        self.backend = CONFIG.get('backend', 'laya')
+        self.identity = None
+
+    def command(self):
+        """Validate local assets without loading a model; preserve venv executable symlinks."""
+        configured_python = ROOT / CONFIG['worker_python']
+        python = configured_python.parent.resolve() / configured_python.name
+        if not python.exists():raise RuntimeError('Configured model Python is missing')
+        if self.backend == 'laya':
+            lab = (ROOT / CONFIG['model_lab']).resolve()
+            adapter = lab / CONFIG['adapter']
+            if not all(p.exists() for p in [lab/'worker.py',lab/'base-model',adapter/'head.safetensors']):
+                raise RuntimeError('Configured local Laya runtime/checkpoint is missing')
+            return [str(python),str(lab/'worker.py'),'--model',str(lab/'base-model'),'--head',str(adapter)]
+        if self.backend == 'decision2':
+            options = CONFIG.get('decision2') or {}
+            model = options.get('model')
+            if not isinstance(model,str) or not model:raise RuntimeError('Decision 2.0 model package is missing')
+            model = (ROOT/model).expanduser().resolve()
+            if not (model/'MODEL_MANIFEST.json').is_file():raise RuntimeError('Decision 2.0 manifest is missing')
+            device = options.get('device','cpu');threads = options.get('threads',4)
+            fraction = options.get('mps_memory_fraction',.5)
+            if not isinstance(device,str) or not re.fullmatch(r'cpu|mps|cuda(?::\d+)?',device):
+                raise ValueError('Unsupported local Decision 2.0 device')
+            if isinstance(threads,bool) or not isinstance(threads,int) or not 1<=threads<=64:
+                raise ValueError('Invalid model thread count')
+            if isinstance(fraction,bool) or not isinstance(fraction,(int,float)) or not 0<fraction<=1:
+                raise ValueError('Invalid MPS memory fraction')
+            return [str(python),str(ROOT/'runtime/decision2_worker.py'),'--model',str(model),
+                    '--device',device,'--threads',str(threads),'--mps-memory-fraction',str(fraction)]
+        raise ValueError('Unsupported local decision backend')
 
     def start(self):
         if self.proc and self.proc.poll() is None:
             return
         self.close()
-        lab = (ROOT / CONFIG['model_lab']).resolve()
-        # Preserve the venv executable symlink: resolving it would lose its site-packages.
-        configured_python = ROOT / CONFIG['worker_python']
-        python = configured_python.parent.resolve() / configured_python.name
-        adapter = lab / CONFIG['adapter']
-        if not all(p.exists() for p in [python, lab / 'worker.py', lab / 'base-model', adapter / 'head.safetensors']):
-            raise RuntimeError('Configured local Laya runtime/checkpoint is missing')
-        env = {k: os.environ[k] for k in ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR'] if k in os.environ}
+        command = self.command()
+        env = {k: os.environ[k] for k in ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR', 'CUDA_VISIBLE_DEVICES'] if k in os.environ}
         env.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', TOKENIZERS_PARALLELISM='false')
         (ROOT / 'logs').mkdir(exist_ok=True)
         self.log = (ROOT / 'logs/decision-worker.log').open('a')
         t = time.perf_counter()
-        self.proc = subprocess.Popen([str(python), str(lab / 'worker.py'), '--model', str(lab / 'base-model'),
-                                      '--head', str(adapter)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=self.log, text=True, bufsize=1, env=env)
         try:
             ready = self.read()
             if ready.get('ready') is not True:
-                raise RuntimeError('Local Laya worker did not become ready')
+                raise RuntimeError('Local decision worker did not become ready')
+            if ready.get('backend') != self.backend:
+                raise RuntimeError('Worker backend does not match configuration')
+            self.identity = ready
         except Exception:
             self.close(); raise
         self.load_seconds = time.perf_counter() - t
 
     def read(self):
         if not select.select([self.proc.stdout], [], [], CONFIG['worker_timeout_seconds'])[0]:
-            raise RuntimeError('Local Laya worker timed out')
+            raise RuntimeError('Local decision worker timed out')
         line = self.proc.stdout.readline()
         if not line:
-            raise RuntimeError('Local Laya worker exited')
+            raise RuntimeError('Local decision worker exited')
         try:
             value = json.loads(line)
         except ValueError as exc:
-            raise RuntimeError('Invalid JSON from local Laya worker') from exc
+            raise RuntimeError('Invalid JSON from local decision worker') from exc
         if not isinstance(value, dict) or 'error' in value:
-            raise RuntimeError('Local Laya worker rejected the request')
+            raise RuntimeError('Local decision worker rejected the request')
         return value
 
     def evaluate(self, request):
@@ -272,9 +299,10 @@ class Engine:
 
     def run(self, request: SelectionRequest):
         t = time.perf_counter()
+        backend = getattr(self.worker,'backend','laya')
         result = {'task': request.task, 'paper_id': request.paper_id, 'answer_generated': False,
                   'external_model_calls': 0, 'local_model_calls': 0, 'selected': None,
-                  'needs_review': True, 'steps': [], 'timing': {}}
+                  'needs_review': True, 'steps': [], 'timing': {}, 'model_backend': backend}
 
         def finish(status, reason):
             result.update(status=status, stop_reason=reason)
@@ -283,6 +311,8 @@ class Engine:
 
         if not request.source_excerpt.strip() or re.search(r'[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]', request.source_excerpt):
             return finish('needs_review', 'expected_short_english_source_excerpt')
+        if request.policy == 'laya' and backend != 'laya':
+            return finish('needs_review', 'requested_laya_backend_unavailable')
         start = time.perf_counter()
         pool = self.graph.claims(request.paper_id)
         result['timing']['graph_candidates_seconds'] = time.perf_counter() - start
@@ -326,28 +356,31 @@ class Engine:
         response, elapsed = self.worker.evaluate(payload)
         result['timing']['model_seconds'] = elapsed
         result['local_model_calls'] = 1
-        result['route'] = 'laya'
-        result['steps'].append('laya_choice')
+        result['route'] = backend
+        result['steps'].append(backend+'_choice')
         usage = response.get('usage') or {}
         result['model_usage'] = usage
         if usage.get('truncated') or usage.get('state_tokens_dropped', 0) or usage.get('options'):
             return finish('needs_review', 'model_input_truncated_or_options_collapsed')
         answer = response.get('answers', {}).get('action', {})
+        if answer.get('error'):
+            return finish('needs_review', 'model_question_rejected')
         key, probabilities = answer.get('choice'), answer.get('probabilities', {})
         if key not in criteria or set(probabilities) != set(criteria):
-            raise RuntimeError('Laya returned a choice outside the supplied candidates')
-        if not all(isinstance(v, (int, float)) and math.isfinite(v) and 0 <= v <= 1 for v in probabilities.values()):
-            raise RuntimeError('Laya returned invalid probabilities')
+            raise RuntimeError('Model returned a choice outside the supplied candidates')
+        if not all(not isinstance(v,bool) and isinstance(v, (int, float)) and math.isfinite(v) and 0 <= v <= 1 for v in probabilities.values()):
+            raise RuntimeError('Model returned invalid probabilities')
         if abs(sum(probabilities.values()) - 1) > .02:
-            raise RuntimeError('Laya returned unnormalized probabilities')
+            raise RuntimeError('Model returned unnormalized probabilities')
         result['confidence'] = probabilities[key]
-        result['confidence_scope'] = 'Eight-candidate source-relationship calibration; not a truth probability.'
+        result['confidence_scope'] = ('Eight-candidate source-relationship calibration; not a truth probability.' if backend=='laya'
+                                     else 'Uncalibrated source-relationship selection; not a truth probability.')
         start = time.perf_counter()
         selected_node = menu[int(key[1:])]
         result['selected'] = self.graph.proof(selected_node)
         result['timing']['evidence_seconds'] = time.perf_counter() - start
         result['steps'].append('read_evidence_and_conditions')
-        result['needs_review'] = (probabilities[key] < CONFIG['review_threshold'] or
+        result['needs_review'] = (backend != 'laya' or probabilities[key] < CONFIG['review_threshold'] or
                                   len(selected_node['description']) > 180 or
                                   result['selected']['evidence_truncated'] or result['selected']['conditions_truncated'])
         if request.include_candidates or result['needs_review']:

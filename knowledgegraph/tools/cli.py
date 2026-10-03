@@ -238,7 +238,7 @@ def main():
     select_cmd.add_argument("--request", help="단일 또는 items 배치 JSON 파일; -는 stdin")
     select_cmd.add_argument("--paper", help="논문 범위, 예: P03")
     select_cmd.add_argument("--excerpt-file", help="영어 원문 60~1000자 파일; -는 stdin")
-    select_cmd.add_argument("--policy", choices=["auto", "laya"], default="auto")
+    select_cmd.add_argument("--policy", choices=["auto", "laya", "model"], default="auto")
     select_cmd.add_argument("--include-candidates", action="store_true")
     walk_cmd=commands.add_parser('walk',help='로컬 Laya 반복 탐색; 방문 노드는 다음 후보에서 제외 (실험용)')
     walk_cmd.add_argument('--request',help='탐색 JSON 파일; -는 stdin')

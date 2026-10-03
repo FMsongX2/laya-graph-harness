@@ -74,8 +74,9 @@ class WalkEngine:
 
     def run(self,request: WalkRequest):
         started=time.perf_counter();visited=set();path=[];history=[];trace=[];model_calls=0;filtered_total=0
+        backend=getattr(self.worker,'backend','laya')
         result={'task':'semantic_walk','route':'local_walk','experimental':True,'answer_generated':False,
-                'external_model_calls':0,'needs_review':True,'goal_verified':False,
+                'external_model_calls':0,'needs_review':True,'goal_verified':False,'model_backend':backend,
                 'visited_scope':'request-local; no graph writes','visited_filtering':'Neo4j before LIMIT and Python before candidate JSON',
                 'confidence_scope':'Uncalibrated navigation with variable candidate counts; not goal or truth certification.'}
         def finish(reason):
@@ -124,14 +125,15 @@ class WalkEngine:
             response=None;model_seconds=0.0
             if len(menu)==1:key='c0';method='single_unvisited_candidate'
             else:
-                response,model_seconds=self.worker.evaluate(payload);model_calls+=1;method='laya'
+                response,model_seconds=self.worker.evaluate(payload);model_calls+=1;method=backend
                 usage=response.get('usage') or {}
                 if usage.get('truncated') or usage.get('state_tokens_dropped',0) or usage.get('options'):
                     return finish('model_input_truncated_or_options_collapsed')
                 answer=response.get('answers',{}).get('action',{});key=answer.get('choice');probs=answer.get('probabilities',{})
-                if key not in criteria or set(probs)!=set(criteria):raise RuntimeError('Laya returned an unavailable walk action')
+                if answer.get('error'):return finish('model_question_rejected')
+                if key not in criteria or set(probs)!=set(criteria):raise RuntimeError('Model returned an unavailable walk action')
                 if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or not 0<=v<=1 for v in probs.values()) or abs(sum(probs.values())-1)>.02:
-                    raise RuntimeError('Laya returned invalid walk probabilities')
+                    raise RuntimeError('Model returned invalid walk probabilities')
             selected=menu[int(key[1:])]
             proof=self.graph.proof(selected)
             next_node=self.graph.node(selected['target_id'])

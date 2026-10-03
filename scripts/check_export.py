@@ -6,7 +6,7 @@ import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 FORBIDDEN_NAMES={'auth.json','neo4j-secret.json','settings.local.json','decision.local.json'}
-FORBIDDEN_PARTS={'.venv','.venv-model','__pycache__','vendor','base-model','trained','state','data','backups','logs'}
+FORBIDDEN_PARTS={'.venv','.venv-model','__pycache__','vendor','base-model','trained','models','state','data','backups','logs'}
 PATTERNS=[re.compile(r'/Users/[A-Za-z0-9_.-]+/'),re.compile(r'/home/[A-Za-z0-9_.-]+/'),
           re.compile(r'gh[pousr]_[A-Za-z0-9]{20,}'),re.compile(r'sk-[A-Za-z0-9_-]{24,}'),
           re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----')]

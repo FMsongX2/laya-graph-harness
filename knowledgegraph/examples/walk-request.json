@@ -1,0 +1,6 @@
+{
+  "paper_id": "P99",
+  "goal": "Find reviewed requirements and limitations of the retrieval method in this paper.",
+  "max_hops": 4,
+  "include_candidates": true
+}

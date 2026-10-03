@@ -26,7 +26,7 @@ async def lifespan(app):
         await asyncio.to_thread(app.state.engine.close)
 
 
-app = FastAPI(title='KnowledgeGraph bounded Laya selection', lifespan=lifespan)
+app = FastAPI(title='KnowledgeGraph bounded local decisions', lifespan=lifespan)
 app.add_middleware(ActivityMiddleware)
 
 
@@ -40,7 +40,8 @@ async def health():
             'warmup_model_calls': worker.warmup_calls, 'local_model_calls': worker.calls - worker.warmup_calls,
             'task': 'source_relationship', 'candidate_count': CONFIG['candidate_count'],
             'port': CONFIG['port'], 'external_model_calls': 0, 'arbitrary_multihop': False,
-            'experimental_semantic_walk':True,'walk_max_hops':16,'visited_filter':'request_local_hash_set'}
+            'experimental_semantic_walk':True,'walk_max_hops':16,'visited_filter':'request_local_hash_set',
+            'model_backend':worker.backend,'model_identity':worker.identity}
 
 
 async def perform(items,walk=False):
