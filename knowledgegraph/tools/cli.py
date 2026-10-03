@@ -72,6 +72,12 @@ def compact_search(result):
     return output
 
 
+def user_text(source):
+    """A user-supplied file or stdin ("-"). Windows editors and PowerShell 5 prepend a UTF-8 BOM."""
+    text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8-sig")
+    return text.removeprefix("\ufeff")
+
+
 def request(path, data=None, timeout=3600):
     """로컬 API만 호출하고 실패 응답도 보존한다."""
     body = json.dumps(data).encode() if data is not None else None
@@ -286,11 +292,11 @@ def main():
             if args.request:
                 if args.paper or args.excerpt_file or args.include_candidates or args.policy != "auto":
                     raise ValueError("Use --request alone, or --paper with --excerpt-file")
-                payload = json.loads(sys.stdin.read() if args.request == "-" else Path(args.request).read_text())
+                payload = json.loads(user_text(args.request))
             else:
                 if not args.paper or not args.excerpt_file:
                     raise ValueError("Provide --request JSON, or --paper and --excerpt-file")
-                text = sys.stdin.read() if args.excerpt_file == "-" else Path(args.excerpt_file).read_text()
+                text = user_text(args.excerpt_file)
                 payload = {"paper_id": args.paper.upper(), "source_excerpt": text,
                            "policy": args.policy, "include_candidates": args.include_candidates}
             if not isinstance(payload, dict): raise ValueError("Selection request must be a JSON object")

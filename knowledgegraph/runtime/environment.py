@@ -37,10 +37,14 @@ def environment():
     model_cache = cache / ("models--" + config["embedding"]["model"].replace("/", "--"))
     cached_snapshot = model_cache / "snapshots" / snapshot.name
     cached_snapshot.parent.mkdir(parents=True, exist_ok=True)
-    if not cached_snapshot.exists():
-        portable.link_directory(cached_snapshot, snapshot)
-    if cached_snapshot.resolve() != snapshot:
-        raise RuntimeError("Tokenizer cache points to a different model snapshot")
+    # A missing snapshot (selection-only use) has nothing to link: Windows junctions need an
+    # existing target, and a dangling POSIX link would fail on the next call. The embedding
+    # service still reports the missing snapshot when it loads the model.
+    if snapshot.is_dir():
+        if not cached_snapshot.exists():
+            portable.link_directory(cached_snapshot, snapshot)
+        if cached_snapshot.resolve() != snapshot:
+            raise RuntimeError("Tokenizer cache points to a different model snapshot")
     (model_cache / "refs").mkdir(exist_ok=True)
     (model_cache / "refs/main").write_text(snapshot.name)
     env["HF_HUB_CACHE"] = str(cache)

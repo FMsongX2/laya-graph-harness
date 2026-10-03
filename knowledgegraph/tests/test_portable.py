@@ -1,4 +1,5 @@
 """Platform boundaries the runtime relies on: locks, graceful stop, and the worker pipe."""
+import codecs
 import json
 from pathlib import Path
 import subprocess
@@ -120,6 +121,18 @@ class WorkerPipeContract(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'configured device'):
                 self.worker.start()
         self.assertIsNone(self.worker.proc)
+
+
+
+class UserInputContract(unittest.TestCase):
+    def test_request_files_saved_by_windows_tools_parse(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from tools import cli
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'request.json'
+            # PowerShell 5 `Set-Content -Encoding utf8` and Notepad write a UTF-8 BOM.
+            path.write_bytes(codecs.BOM_UTF8 + json.dumps({'paper_id': 'P01', 'source_excerpt': '근거'}, ensure_ascii=False).encode())
+            self.assertEqual(json.loads(cli.user_text(str(path)))['source_excerpt'], '근거')
 
 
 if __name__ == '__main__':
