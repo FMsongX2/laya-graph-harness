@@ -28,6 +28,9 @@ approved knowledge corpus are separate local assets and are not in this reposito
 - Agent skill/bootstrap source, installation overlay, contract tests, and
   sanitized local benchmark aggregates.
 
+To browse reviewed knowledge in Obsidian (optionally beside PersonaGraph notes),
+see [Obsidian view](docs/obsidian.md): `kg export-obsidian --out <vault>/knowledge`.
+
 ## Run the tests without models or private data
 
 Python 3.12 on macOS or Linux:
