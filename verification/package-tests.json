@@ -17,7 +17,7 @@
     "raw traces",
     "hook trust state"
   ],
-  "tested_platform": "macOS arm64; current push Linux CI pending",
+  "tested_platform": "macOS arm64 and GitHub Linux contracts passed",
   "public_decision2_adapter_smoke": {
     "passed": true,
     "device": "mps",
@@ -26,5 +26,10 @@
     "two_local_choices_with_feedback_checked": true,
     "production_config_changed": false
   },
-  "cli_help_without_runtime_startup": true
+  "cli_help_without_runtime_startup": true,
+  "github_linux_ci": {
+    "conclusion": "success",
+    "tested_source_commit": "45460d79db64c095e8c0a5d8efdf38b944779df6",
+    "url": "https://github.com/FMsongX2/laya-graph-harness/actions/runs/37156250976"
+  }
 }
