@@ -57,26 +57,27 @@ class LeaseContract(unittest.TestCase):
         async def send(message):messages.append(message)
         with tempfile.TemporaryDirectory() as d:
             with patch.object(lifecycle,'LOCK',Path(d)/'lock'), patch.object(lifecycle,'LAST_USE',Path(d)/'last'):
-                with lifecycle.LOCK.open('a') as lock:
-                    lifecycle.fcntl.flock(lock,lifecycle.fcntl.LOCK_EX)
+                with lifecycle.portable.locked(lifecycle.LOCK):
                     asyncio.run(lifecycle.ActivityMiddleware(inner)({'type':'http','path':'/select'},None,send))
                 self.assertFalse(entered)
                 self.assertEqual(messages[0]['status'],503)
 
     def test_shutdown_owner_mismatch_refuses_force_kill(self):
         def fail(): raise RuntimeError('graceful shutdown failed')
-        with patch.object(lifecycle.os,'killpg') as kill:
+        with patch.object(lifecycle.portable,'kill_group') as kill:
             with self.assertRaises(RuntimeError):
                 lifecycle.stop_idle_service(fail,lambda:{'pid':os.getpid()},{'pid':os.getpid()+1})
             kill.assert_not_called()
 
     def test_idle_owned_group_can_be_released_after_grace_failure(self):
-        process=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],start_new_session=True)
+        process=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],**lifecycle.portable.detached())
         def fail():raise RuntimeError('controlled grace failure')
         def owned():return {'pid':process.pid} if process.poll() is None else None
         try:
             self.assertTrue(lifecycle.stop_idle_service(fail,owned,{'pid':process.pid}))
-            self.assertEqual(process.wait(timeout=5),-9)
+            code=process.wait(timeout=5)
+            if lifecycle.portable.WINDOWS: self.assertNotEqual(code,0)
+            else: self.assertEqual(code,-9)
         finally:
             if process.poll() is None:process.terminate();process.wait(timeout=5)
 

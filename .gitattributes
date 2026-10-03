@@ -1,0 +1,6 @@
+# Shell launchers break with CRLF; cmd launchers expect it.
+knowledgegraph/kg text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+Dockerfile text eol=lf

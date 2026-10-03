@@ -1,0 +1,12 @@
+# CPU-only override: docker compose -f compose.yaml -f compose.cpu.yaml up -d
+services:
+  harness:
+    build:
+      args:
+        TORCH_FLAVOR: cpu
+    image: laya-graph-harness:${LAYA_TAG:-local}-cpu
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: !reset null
+    deploy: !reset {}
+  ollama:
+    deploy: !reset {}

@@ -38,3 +38,6 @@ model-worker/models/
 dist/
 build/
 .DS_Store
+
+# Docker deployment volume (private assets)
+laya-home/

@@ -1,0 +1,47 @@
+# NVIDIA GPU deployment. CPU-only hosts: docker compose -f compose.yaml -f compose.cpu.yaml up -d
+# Private assets live in LAYA_HOME (default ./laya-home); see docs/docker.md.
+name: laya-graph-harness
+services:
+  harness:
+    build:
+      context: .
+      args:
+        TORCH_FLAVOR: ${TORCH_FLAVOR:-cu128}
+    image: laya-graph-harness:${LAYA_TAG:-local}
+    # Cognee publishes each dataset's Neo4j container on the Docker host's 127.0.0.1 and
+    # stores bolt://localhost:<port>; host networking keeps those registered URLs valid.
+    network_mode: host
+    volumes:
+      - ${LAYA_HOME:-./laya-home}:/data/laya
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      LAYA_PREPARE: ${LAYA_PREPARE:-1}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stop_grace_period: 90s
+    restart: unless-stopped
+
+  # Optional local model server for `kg search`/`kg build`: docker compose --profile ollama up -d
+  ollama:
+    image: ollama/ollama:0.35.1
+    profiles: [ollama]
+    network_mode: host
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  ollama:

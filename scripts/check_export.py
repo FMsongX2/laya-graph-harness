@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 FORBIDDEN_NAMES={'auth.json','neo4j-secret.json','settings.local.json','decision.local.json'}
 FORBIDDEN_PARTS={'.venv','.venv-model','__pycache__','vendor','base-model','trained','models','state','data','backups','logs'}
 PATTERNS=[re.compile(r'/Users/[A-Za-z0-9_.-]+/'),re.compile(r'/home/[A-Za-z0-9_.-]+/'),
+          re.compile(r'[A-Za-z]:[\\/]+Users[\\/]+[A-Za-z0-9_.-]+[\\/]',re.IGNORECASE),
           re.compile(r'gh[pousr]_[A-Za-z0-9]{20,}'),re.compile(r'sk-[A-Za-z0-9_-]{24,}'),
           re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----')]
 
@@ -25,7 +26,7 @@ def check():
         if p.is_symlink() or p.name in FORBIDDEN_NAMES or any(x in FORBIDDEN_PARTS for x in relative.parts):
             errors.append(str(relative)+': private/runtime asset');continue
         if p.stat().st_size>2_000_000:errors.append(str(relative)+': unexpected large file');continue
-        try:content=p.read_text()
+        try:content=p.read_text(encoding='utf-8')
         except UnicodeDecodeError:errors.append(str(relative)+': unexpected binary');continue
         if any(pattern.search(content) for pattern in PATTERNS):errors.append(str(relative)+': host path or credential pattern')
     if errors:raise ValueError('\n'.join(errors))

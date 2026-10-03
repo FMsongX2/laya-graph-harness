@@ -10,7 +10,8 @@ import sys
 import time
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[5]
-KG = Path(os.environ.get('LAYA_GRAPH_KG_ROOT', str(PACKAGE_ROOT/'knowledgegraph'))).expanduser().resolve()/'kg'
+KG = Path(os.environ.get('LAYA_GRAPH_KG_ROOT', str(PACKAGE_ROOT/'knowledgegraph'))).expanduser().resolve()/(
+    'kg.cmd' if os.name == 'nt' else 'kg')
 LOG = KG.parent/'logs/domain-alignment-bootstrap.jsonl'
 
 
@@ -41,7 +42,7 @@ def should_prepare(event):
 def prepare():
     t = time.perf_counter()
     proc = subprocess.run([str(KG), 'prepare'], stdin=subprocess.DEVNULL,
-                          capture_output=True, text=True, timeout=360)
+                          capture_output=True, text=True, encoding='utf-8', timeout=360)
     if proc.returncode: raise RuntimeError('Local runtime preparation failed; inspect kg status and decision-status')
     result = json.loads(proc.stdout)
     if not result.get('ready'): raise RuntimeError('Local runtime is not ready')

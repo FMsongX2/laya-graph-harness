@@ -12,6 +12,9 @@ Set `LAYA_GRAPH_KG_ROOT` to the single installed KnowledgeGraph project root.
 Claude Code preprocesses the command before reading this skill. In other
 hosts, use the bundled hook source or run `"$LAYA_GRAPH_KG_ROOT/kg" prepare`
 once before querying. Do not start parallel project roots over the same data.
+On Windows the launcher is `kg.cmd` (`"%LAYA_GRAPH_KG_ROOT%\kg.cmd"`, or
+`"$LAYA_GRAPH_KG_ROOT/kg.cmd"` from Git Bash); the bootstrap picks it
+automatically and needs a `python3` (python.org installs provide `py -3`).
 
 Given the actual paper ID and an English excerpt of 60–1000 characters,
 submit one JSON file with `paper_id`, `source_excerpt` and `policy: "auto"`:

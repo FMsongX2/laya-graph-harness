@@ -24,6 +24,8 @@ MAX_OUTPUT_TOKENS = CONFIG["chat"]["max_output_tokens"]
 EMBED_MAX_TOKENS = CONFIG["embedding"]["max_tokens"]
 EMBED_DIM = CONFIG["embedding"]["dimensions"]
 CPU_THREADS = CONFIG["embedding"]["cpu_threads"]
+# "cpu" reproduces the original float32 index exactly; "auto" uses CUDA when present.
+EMBED_DEVICE = CONFIG["embedding"].get("device", "cpu")
 
 # These settings apply to this process only. The original HF snapshot is read-only input.
 for key, value in {
@@ -37,6 +39,7 @@ for key, value in {
     'XDG_CACHE_HOME': str(ROOT / 'cache/xdg'),
     'MPLCONFIGDIR': str(ROOT / 'cache/matplotlib'),
     'TMPDIR': str(ROOT / 'tmp'),
+    **({'TEMP': str(ROOT / 'tmp'), 'TMP': str(ROOT / 'tmp')} if os.name == 'nt' else {}),
     'TOKENIZERS_PARALLELISM': 'false',
 }.items():
     os.environ[key] = value
@@ -115,7 +118,8 @@ async def lifespan(app):
     torch.set_num_interop_threads(1)
     started = perf_counter()
     manifest = snapshot_manifest()
-    model = SentenceTransformer(str(SNAPSHOT), device='cpu', local_files_only=True,
+    device = ('cuda' if torch.cuda.is_available() else 'cpu') if EMBED_DEVICE == 'auto' else EMBED_DEVICE
+    model = SentenceTransformer(str(SNAPSHOT), device=device, local_files_only=True,
                                 trust_remote_code=False, cache_folder=str(ROOT / 'cache/hf'))
     model.eval()
     if model.get_sentence_embedding_dimension() != EMBED_DIM or model.max_seq_length != EMBED_MAX_TOKENS:
@@ -294,7 +298,7 @@ def embedding_work(texts):
     if any(count > EMBED_MAX_TOKENS for count in token_lengths):
         raise ValueError(f'Embedding input exceeds {EMBED_MAX_TOKENS} tokens including special tokens: {token_lengths}')
     vectors = model.encode(texts, batch_size=4, normalize_embeddings=True, convert_to_numpy=True,
-                           precision='float32', show_progress_bar=False, device='cpu')
+                           precision='float32', show_progress_bar=False, device=str(model.device))
     if vectors.shape != (len(texts), EMBED_DIM):
         raise RuntimeError(f'Unexpected embedding shape: {vectors.shape}')
     norms = np.linalg.norm(vectors, axis=1)

@@ -1,7 +1,8 @@
 """Cognee 상태와 모델 접점을 이 작업 폴더에 고정한다."""
 from pathlib import Path
 import json
-import os
+try: from . import portable
+except ImportError: import portable
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def environment():
     """상속된 API 인증·프록시 설정 없이 로컬 실행 환경을 만든다."""
     config = json.loads((ROOT / "config/settings.json").read_text())
-    env = {key: os.environ[key] for key in ("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM") if key in os.environ}
+    env = portable.passthrough_environment(("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TERM"))
     directories = {
         "DATA_ROOT_DIRECTORY": "state/data",
         "SYSTEM_ROOT_DIRECTORY": "state/system",
@@ -28,6 +29,7 @@ def environment():
         path = ROOT / name
         path.mkdir(parents=True, exist_ok=True)
         env[key] = str(path)
+    env.update(portable.temporary_environment(ROOT / "runtime/tmp"))
     # Cognee resolves the embedding tokenizer by its HF repo name. Give it an
     # offline cache view of the exact existing snapshot, without touching it.
     snapshot = Path(config["embedding"]["snapshot"]).resolve()
@@ -35,10 +37,14 @@ def environment():
     model_cache = cache / ("models--" + config["embedding"]["model"].replace("/", "--"))
     cached_snapshot = model_cache / "snapshots" / snapshot.name
     cached_snapshot.parent.mkdir(parents=True, exist_ok=True)
-    if not cached_snapshot.exists():
-        cached_snapshot.symlink_to(snapshot, target_is_directory=True)
-    if cached_snapshot.resolve() != snapshot:
-        raise RuntimeError("Tokenizer cache points to a different model snapshot")
+    # A missing snapshot (selection-only use) has nothing to link: Windows junctions need an
+    # existing target, and a dangling POSIX link would fail on the next call. The embedding
+    # service still reports the missing snapshot when it loads the model.
+    if snapshot.is_dir():
+        if not cached_snapshot.exists():
+            portable.link_directory(cached_snapshot, snapshot)
+        if cached_snapshot.resolve() != snapshot:
+            raise RuntimeError("Tokenizer cache points to a different model snapshot")
     (model_cache / "refs").mkdir(exist_ok=True)
     (model_cache / "refs/main").write_text(snapshot.name)
     env["HF_HUB_CACHE"] = str(cache)
