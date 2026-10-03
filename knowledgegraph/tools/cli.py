@@ -295,6 +295,9 @@ def main():
                 else:payload['start_node_id']=args.start_node
                 if args.target_node:payload['target_node_id']=args.target_node
             if not isinstance(payload,dict):raise ValueError('Walk request must be a JSON object')
+            if not owned_process():
+                start()
+                request('/kg/graph-ready',timeout=190)
             result=decision_cli.navigation(payload)
         elif args.command == "select":
             import decision_cli
