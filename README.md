@@ -5,16 +5,20 @@ The agent submits a bounded request once; code retrieves candidates, makes the
 local choice, and collects source evidence and conditions. The agent evaluates
 goal relevance and decides whether a focused follow-up is needed.
 
-This first version supports **short English source excerpts → one paper's
-reviewed relationship candidates**. It is not a general multi-hop navigator,
-and it has no learned STOP/BACK policy. The trained checkpoint and the approved
-knowledge corpus are separate local assets and are not in this repository.
+The default selector supports **short English source excerpts → one paper's
+reviewed relationship candidates**. A separate experimental `kg walk` endpoint
+chains local selections over actual semantic edges with request-local visited
+filtering. It is bounded single-path exploration, not a validated general
+navigator, and has no learned STOP/BACK policy. The trained checkpoint and the
+approved knowledge corpus are separate local assets and are not in this repository.
 
 ## Included
 
 - Read-only Neo4j candidate and evidence access with approved-record checks.
 - Exact citation-link lookup before an optional eight-candidate Laya choice.
 - Resident JSONL model worker, sequential batches of up to sixteen requests.
+- Experimental local walk with visited UUID hash sets, candidate exclusion before
+  model input, evidence feedback, bounded termination and isolated request state.
 - Shared activity leases, singleton startup, one warmup per worker.
 - Automatic cleanup after 15 minutes idle, busy-job/transaction protection,
   process ownership checks, and lazy restart on the next managed call.

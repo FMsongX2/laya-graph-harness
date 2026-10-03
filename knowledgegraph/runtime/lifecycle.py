@@ -81,7 +81,7 @@ def tracked_cli(fn):
     @functools.wraps(fn)
     def wrapper():
         command = sys.argv[1] if len(sys.argv) > 1 else ''
-        active = {'up', 'prepare', 'select', 'search', 'datasets', 'add', 'build',
+        active = {'up', 'prepare', 'select', 'walk', 'search', 'datasets', 'add', 'build',
                   'ingest-papers', 'decision-up'}
         if command in active:
             with Lease():
